@@ -14,6 +14,14 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    # Hemat: build hanya jalan kalau file kode berubah.
+    # Edit README/docs saja -> workflow di-skip otomatis.
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/**'
   workflow_dispatch:
 
 permissions:
