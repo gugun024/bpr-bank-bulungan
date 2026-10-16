@@ -31,7 +31,7 @@ class _OperatorAppState extends State<OperatorApp> {
 
   Future<void> _initWindow() async {
     await windowManager.ensureInitialized();
-    await windowManager.setTitle('BPR Bank Bulungan - Operator');
+    await windowManager.setTitle('PT. BPR Bank Bulungan - Operator');
     await windowManager.setMinimumSize(const Size(1100, 720));
   }
 
@@ -100,7 +100,7 @@ class _OperatorAppState extends State<OperatorApp> {
       ),
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('BPR Bank Bulungan — Operator'),
+          title: const Text('PT. BPR Bank Bulungan — Operator'),
           backgroundColor: AudienceTheme.navy800,
           foregroundColor: Colors.white,
           actions: [

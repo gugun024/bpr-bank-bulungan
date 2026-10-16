@@ -1,4 +1,4 @@
-# BPR Bank Bulungan — Aplikasi Undian Berhadiah (Flutter Windows)
+# PT. BPR Bank Bulungan — Aplikasi Undian Berhadiah (Flutter Windows)
 
 Aplikasi desktop Windows untuk menjalankan undian berhadiah bank:
 - **Window Operator** (monitor utama): input kupon manual / kocok random, kelola hadiah, riwayat, import data
