@@ -320,10 +320,14 @@ class PrizePicker extends StatelessWidget {
       return const Text('Belum ada hadiah. Tambahkan di tab Hadiah.',
           style: TextStyle(color: OpTheme.textMuted, fontSize: 13));
     }
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [for (final p in prizes) _chip(p)],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < prizes.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          _chip(prizes[i]),
+        ],
+      ],
     );
   }
 
@@ -337,7 +341,7 @@ class PrizePicker extends StatelessWidget {
       onTap: done ? null : () => onChanged(p),
       borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         decoration: BoxDecoration(
           color: isSel
               ? OpTheme.navy
@@ -355,28 +359,28 @@ class PrizePicker extends StatelessWidget {
           ),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.card_giftcard,
-                size: 18,
+                size: 20,
                 color: isSel
                     ? OpTheme.gold
                     : done
                         ? Colors.grey
                         : OpTheme.navy),
-            const SizedBox(width: 8),
-            Text(name,
-                style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color: isSel
-                        ? Colors.white
-                        : done
-                            ? Colors.grey
-                            : OpTheme.navy)),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(name,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: isSel
+                          ? Colors.white
+                          : done
+                              ? Colors.grey
+                              : OpTheme.navy)),
+            ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: isSel
                     ? OpTheme.gold
@@ -387,7 +391,7 @@ class PrizePicker extends StatelessWidget {
               ),
               child: Text(done ? 'HABIS' : 'Sisa $left',
                   style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: FontWeight.w800,
                       color: isSel
                           ? OpTheme.navyDark

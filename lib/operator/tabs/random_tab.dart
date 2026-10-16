@@ -144,7 +144,8 @@ class _RandomTabState extends State<RandomTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return SingleChildScrollView(
+        child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const TabHeader(
@@ -210,7 +211,7 @@ class _RandomTabState extends State<RandomTab> {
         if (_busy) const LinearProgressIndicator(),
         if (_drawn != null) _resultCard(_drawn!),
       ],
-    );
+    ));
   }
 
   Widget _resultCard(DrawResult res) {

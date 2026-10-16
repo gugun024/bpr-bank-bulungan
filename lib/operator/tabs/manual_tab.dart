@@ -177,7 +177,8 @@ class _ManualTabState extends State<ManualTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return SingleChildScrollView(
+        child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const TabHeader(
@@ -258,7 +259,7 @@ class _ManualTabState extends State<ManualTab> {
           _banner(_rejectedInfo!, OpTheme.danger, Icons.block, big: true),
         if (_found != null) _accountCard(_found!),
       ],
-    );
+    ));
   }
 
   Widget _banner(String text, Color color, IconData icon, {bool big = false}) {
