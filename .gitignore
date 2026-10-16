@@ -1,0 +1,23 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.g.dart
+
+# Windows build output
+windows/flutter/generated_plugin_registrant.*
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# App runtime data (jangan commit database lokal)
+*.db
+*.db-journal
