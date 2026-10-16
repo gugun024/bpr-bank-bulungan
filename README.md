@@ -18,7 +18,7 @@ Tunggu beberapa menit di tab **Actions**, lalu unduh zip-nya di tab
 **Releases**. Push biasa ke `main` juga otomatis di-build (hasilnya ada di
 tab Actions > Artifacts, tanpa Release).
 
-Isi zip: folder `Release/` — jalankan `undian_bank.exe` di dalamnya.
+Isi zip: folder `Release/` — jalankan `BPR_Bank_Bulungan.exe` di dalamnya.
 Folder tersebut portable (bisa dicopy ke flashdisk / PC lain).
 
 ## Cara build manual di PC Windows

@@ -69,6 +69,28 @@ jobs:
           p.write_text(src, encoding="utf-8")
           print("flutter_window.cpp patched OK")
 
+          # Nama file .exe: BPR_Bank_Bulungan.exe (bukan undian_bank.exe).
+          cmake = pathlib.Path("windows/CMakeLists.txt")
+          csrc = cmake.read_text(encoding="utf-8")
+          old_binary = 'set(BINARY_NAME "undian_bank")'
+          assert old_binary in csrc, "anchor BINARY_NAME tidak ditemukan"
+          csrc = csrc.replace(
+              old_binary, 'set(BINARY_NAME "BPR_Bank_Bulungan")', 1)
+          cmake.write_text(csrc, encoding="utf-8")
+          print("CMakeLists.txt BINARY_NAME patched OK")
+
+          # Nama produk di properties file Windows (Task Manager, dsb).
+          rc = pathlib.Path("windows/runner/Runner.rc")
+          rsrc = rc.read_text(encoding="utf-8")
+          rsrc = rsrc.replace(
+              'VALUE "FileDescription", "undian_bank"',
+              'VALUE "FileDescription", "PT. BPR Bank Bulungan - Aplikasi Undian"')
+          rsrc = rsrc.replace(
+              'VALUE "ProductName", "undian_bank"',
+              'VALUE "ProductName", "PT. BPR Bank Bulungan"')
+          rc.write_text(rsrc, encoding="utf-8")
+          print("Runner.rc patched OK")
+
       - name: Ambil dependencies
         run: flutter pub get
 
