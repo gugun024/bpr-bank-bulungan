@@ -1,0 +1,101 @@
+# Build otomatis aplikasi Windows (PT. BPR Bank Bulungan).
+#
+# Cara pakai:
+#   - Push biasa ke main  -> build jalan, hasil bisa diunduh di tab Actions
+#                           (artifacts, 90 hari).
+#   - Push tag v*          -> build jalan + GitHub Release dibuat otomatis
+#                           dengan file .zip terlampir. Contoh:
+#                               git tag v1.0.0 && git push origin v1.0.0
+#   - Manual               -> tab Actions > Build Windows Release > Run workflow.
+
+name: Build Windows Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # untuk membuat GitHub Release
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Generate Windows runner
+        run: flutter create --platforms=windows .
+
+      - name: Patch flutter_window.cpp (registrasi plugin sub-window)
+        # Wajib: tanpa ini window penonton (sub-window) tidak bisa fullscreen
+        # karena plugin window_manager tidak terdaftar di engine keduanya.
+        # Lihat README > "Cara build di PC Windows" langkah 3.
+        shell: python
+        run: |
+          import pathlib
+          p = pathlib.Path("windows/runner/flutter_window.cpp")
+          src = p.read_text(encoding="utf-8")
+
+          include = '#include "desktop_multi_window/desktop_multi_window_plugin.h"'
+          if "desktop_multi_window_plugin.h" not in src:
+              anchor = '#include "flutter/generated_plugin_registrant.h"'
+              assert anchor in src, "anchor include tidak ditemukan"
+              src = src.replace(anchor, anchor + "\n" + include, 1)
+
+          callback = """  DesktopMultiWindowSetWindowCreatedCallback([](void* controller) {
+                auto* flutter_view_controller =
+                    reinterpret_cast<flutter::FlutterViewController*>(controller);
+                auto* registry = flutter_view_controller->engine();
+                RegisterPlugins(registry);
+              });
+          """
+          if "DesktopMultiWindowSetWindowCreatedCallback" not in src:
+              anchor = "RegisterPlugins(flutter_controller_->engine());"
+              assert anchor in src, "anchor RegisterPlugins tidak ditemukan"
+              src = src.replace(anchor, anchor + "\n" + callback, 1)
+
+          p.write_text(src, encoding="utf-8")
+          print("flutter_window.cpp patched OK")
+
+      - name: Ambil dependencies
+        run: flutter pub get
+
+      - name: Analisis
+        run: flutter analyze
+
+      - name: Build Windows (.exe rilis)
+        run: flutter build windows --release
+
+      - name: Zip hasil build
+        shell: pwsh
+        run: |
+          $out = "build/windows/x64/runner/Release"
+          if (!(Test-Path $out)) { throw "Folder hasil build tidak ditemukan: $out" }
+          Compress-Archive -Path "$out/*" -DestinationPath "PT-BPR-Bank-Bulungan-windows.zip" -Force
+          Get-Item "PT-BPR-Bank-Bulungan-windows.zip" | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PT-BPR-Bank-Bulungan-windows
+          path: PT-BPR-Bank-Bulungan-windows.zip
+          retention-days: 90
+
+      - name: Buat GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: PT-BPR-Bank-Bulungan-windows.zip
+          generate_release_notes: true

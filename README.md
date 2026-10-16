@@ -4,7 +4,24 @@ Aplikasi desktop Windows untuk menjalankan undian berhadiah bank:
 - **Window Operator** (monitor utama): input kupon manual / kocok random, kelola hadiah, riwayat, import data
 - **Window Penonton** (monitor kedua / proyektor, fullscreen): splash, animasi kocokan, pengumuman pemenang
 
-## Cara build di PC Windows
+## Cara dapat file .exe (otomatis via GitHub Actions) ⭐
+
+Tidak perlu build manual di PC. Cukup push tag versi, GitHub akan build
+dan membuat Release otomatis berisi `PT-BPR-Bank-Bulungan-windows.zip`:
+
+```
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Tunggu beberapa menit di tab **Actions**, lalu unduh zip-nya di tab
+**Releases**. Push biasa ke `main` juga otomatis di-build (hasilnya ada di
+tab Actions > Artifacts, tanpa Release).
+
+Isi zip: folder `Release/` — jalankan `undian_bank.exe` di dalamnya.
+Folder tersebut portable (bisa dicopy ke flashdisk / PC lain).
+
+## Cara build manual di PC Windows
 
 1. Install [Flutter SDK](https://docs.flutter.dev/get-started/install/windows) (stable) dan
    jalankan `flutter doctor` sampai centang Windows Desktop.
