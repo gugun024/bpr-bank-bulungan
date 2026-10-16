@@ -28,6 +28,17 @@ class _OperatorAppState extends State<OperatorApp> {
   void initState() {
     super.initState();
     _initWindow();
+    // Terima notifikasi dari window penonton (mis. disembunyikan via Alt+F4)
+    // agar status "Layar Penonton" di operator selalu akurat.
+    AudienceChannel.initReceiver((method) async {
+      if (method == AudienceProtocol.audienceHidden && mounted) {
+        setState(() {
+          _audienceOpen = false;
+          _audienceController = null;
+          AudienceChannel.enabled = false;
+        });
+      }
+    });
   }
 
   Future<void> _initWindow() async {

@@ -12,6 +12,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   desktop_multi_window: ^0.3.0
   window_manager: ^0.5.1
+  screen_retriever: ^0.2.2 # posisi otomatis layar penonton di monitor ke-2
   sqflite_common_ffi: ^2.3.6
   path_provider: ^2.1.5
   excel: ^4.0.6

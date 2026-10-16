@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../shared/protocol.dart';
@@ -47,7 +48,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
 
   static const _channel = WindowMethodChannel(
     AudienceProtocol.channelName,
-    mode: ChannelMode.unidirectional,
+    mode: ChannelMode.bidirectional,
   );
 
   @override
@@ -62,6 +63,15 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
     try {
       await windowManager.ensureInitialized();
       await windowManager.setTitle('PT. BPR Bank Bulungan - Layar Penonton');
+      // Otomatis pindah ke monitor kedua (proyektor) bila ada;
+      // kalau cuma 1 monitor, tetap fullscreen di monitor utama.
+      try {
+        final displays = await screenRetriever.getAllDisplays();
+        if (displays.length > 1) {
+          final pos = displays[1].visiblePosition;
+          if (pos != null) await windowManager.setPosition(pos);
+        }
+      } catch (_) {}
       await windowManager.setFullScreen(true);
       // Cegah window penonton tertutup tidak sengaja (mis. Alt+F4):
       // percobaan tutup diubah jadi sembunyikan saja (lihat onWindowClose).
@@ -75,10 +85,14 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   /// Alt+F4 / tombol tutup JANGAN menghancurkan window penonton —
   /// sembunyikan saja supaya operator bisa membukanya kembali instan
   /// (state tampilan tetap terjaga) via "Buka Layar Penonton".
+  /// Operator diberi tahu agar statusnya akurat.
   @override
   void onWindowClose() async {
     try {
       await windowManager.hide();
+    } catch (_) {}
+    try {
+      await _channel.invokeMethod(AudienceProtocol.audienceHidden);
     } catch (_) {}
   }
 

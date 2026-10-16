@@ -16,22 +16,41 @@ class AudienceProtocol {
   /// args: {hadiah: String} — tampilkan hadiah yang sedang diundi
   static const String showPrize = 'showPrize';
 
+  /// audience → operator: window penonton disembunyikan (mis. Alt+F4).
+  /// Tidak ada args.
+  static const String audienceHidden = 'audienceHidden';
+
   static const String argCoupon = 'coupon';
   static const String argNama = 'nama';
   static const String argHadiah = 'hadiah';
 }
 
 /// Pengirim perintah ke window penonton (dipakai window operator).
+/// Channel dua arah: operator juga menerima notifikasi dari penonton
+/// (mis. penonton disembunyikan) via [initReceiver].
 class AudienceChannel {
   AudienceChannel._();
 
-  static const _channel = WindowMethodChannel(
+  static final _channel = WindowMethodChannel(
     AudienceProtocol.channelName,
-    mode: ChannelMode.unidirectional,
+    mode: ChannelMode.bidirectional,
   );
 
   /// Nyalakan setelah window penonton berhasil dibuka.
   static bool enabled = false;
+
+  /// Daftarkan penerima pesan dari window penonton. Dipanggil sekali
+  /// saat aplikasi operator mulai.
+  static Future<void> initReceiver(
+      Future<void> Function(String method) onMessage) async {
+    try {
+      await _channel.setMethodCallHandler((call) async {
+        await onMessage(call.method);
+      });
+    } catch (_) {
+      // Gagal registrasi — status penonton tetap ditracking manual.
+    }
+  }
 
   static Future<void> send(String method, [Map<String, Object?>? args]) async {
     if (!enabled) return;
