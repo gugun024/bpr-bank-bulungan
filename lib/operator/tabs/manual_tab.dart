@@ -25,6 +25,7 @@ class _ManualTabState extends State<ManualTab> {
   String? _rejectedInfo; // info penolakan (sudah menang)
   List<Prize> _prizes = [];
   Prize? _prize;
+  Map<int, int> _remaining = {}; // prizeId -> sisa kuota
   bool _busy = false;
   int _couponWidth = 6;
 
@@ -34,17 +35,43 @@ class _ManualTabState extends State<ManualTab> {
     _loadPrizes();
   }
 
+  int _left(Prize p) => _remaining[p.id] ?? p.qty;
+
   Future<void> _loadPrizes() async {
-    final prizes = await DatabaseHelper.instance.getPrizes();
-    final total = await DatabaseHelper.instance.totalCoupons();
+    final db = DatabaseHelper.instance;
+    final prizes = await db.getPrizes();
+    final total = await db.totalCoupons();
+    final remaining = <int, int>{};
+    for (final p in prizes) {
+      remaining[p.id!] = p.qty - await db.winnerCountForPrize(p.id!);
+    }
     if (!mounted) return;
     setState(() {
       _prizes = prizes;
+      _remaining = remaining;
       _couponWidth = total.toString().length.clamp(6, 12);
-      if (_prize == null || !prizes.any((p) => p.id == _prize!.id)) {
-        _prize = prizes.isNotEmpty ? prizes.first : null;
+      // Pilih otomatis hadiah pertama yang masih ada sisa.
+      if (_prize == null ||
+          !prizes.any((p) => p.id == _prize!.id) ||
+          _left(_prize!) <= 0) {
+        _prize = null;
+        for (final p in prizes) {
+          if (_left(p) > 0) {
+            _prize = p;
+            break;
+          }
+        }
       }
     });
+  }
+
+  void _onPrizeChanged(Prize? p) {
+    setState(() => _prize = p);
+    // Umumkan "hadiah berikutnya" ke layar penonton.
+    if (p != null) {
+      AudienceChannel.send(
+          AudienceProtocol.showPrize, {AudienceProtocol.argHadiah: p.name});
+    }
   }
 
   Future<void> _lookup() async {
@@ -119,6 +146,14 @@ class _ManualTabState extends State<ManualTab> {
         _found = null;
         _couponCtrl.clear();
       });
+      await _loadPrizes(); // refresh sisa kuota hadiah
+    } on StateError catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: OpTheme.danger),
+        );
+        await _loadPrizes();
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -148,51 +183,66 @@ class _ManualTabState extends State<ManualTab> {
         const TabHeader(
           title: 'Undian Manual',
           subtitle:
-              'Ketik nomor kupon yang keluar dari alat roll, verifikasi, lalu tampilkan ke layar penonton.',
+              'Pilih hadiah dulu, lalu ketik nomor kupon dari alat roll dan tampilkan ke layar penonton.',
         ),
         const SizedBox(height: 20),
         OpCard(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _couponCtrl,
-                  autofocus: true,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 6,
-                    fontFeatures: [FontFeature.tabularFigures()],
-                    color: OpTheme.navy,
+              Row(
+                children: [
+                  Expanded(child: _prizeDropdown()),
+                  const SizedBox(width: 12),
+                  if (_prize != null)
+                    StatusBadge('Sisa ${_left(_prize!)}',
+                        fg: OpTheme.success, bg: OpTheme.successSoft),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _couponCtrl,
+                      autofocus: true,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 6,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                        color: OpTheme.navy,
+                      ),
+                      decoration: OpTheme.input('Nomor kupon',
+                          hint: 'cth: 000068',
+                          prefix: const Icon(Icons.confirmation_number_outlined,
+                              color: OpTheme.navy)),
+                      onSubmitted: (_) => _lookup(),
+                    ),
                   ),
-                  decoration: OpTheme.input('Nomor kupon',
-                      hint: 'cth: 000068',
-                      prefix: const Icon(Icons.confirmation_number_outlined,
-                          color: OpTheme.navy)),
-                  onSubmitted: (_) => _lookup(),
-                ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                onPressed: _busy ? null : _lookup,
-                style: OpTheme.primaryButton,
-                icon: const Icon(Icons.search),
-                label: const Text('Cari'),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: _reset,
-                style: OutlinedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reset'),
+                  const SizedBox(width: 12),
+                  FilledButton.icon(
+                    onPressed: (_busy || _prize == null) ? null : _lookup,
+                    style: OpTheme.primaryButton,
+                    icon: const Icon(Icons.search),
+                    label: const Text('Cari'),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _reset,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 18),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Reset'),
+                  ),
+                ],
               ),
             ],
           ),
@@ -205,6 +255,31 @@ class _ManualTabState extends State<ManualTab> {
           _banner(_rejectedInfo!, OpTheme.danger, Icons.block, big: true),
         if (_found != null) _accountCard(_found!),
       ],
+    );
+  }
+
+  /// Dropdown hadiah dengan sisa kuota; hadiah habis tidak bisa dipilih.
+  Widget _prizeDropdown() {
+    return DropdownButtonFormField<Prize>(
+      initialValue: _prize,
+      decoration: OpTheme.input('Hadiah yang diundi',
+          prefix:
+              const Icon(Icons.card_giftcard_outlined, color: OpTheme.navy)),
+      items: [
+        for (final p in _prizes)
+          DropdownMenuItem(
+            value: p,
+            enabled: _left(p) > 0,
+            child: Text(
+              _left(p) > 0
+                  ? '${p.name}  (sisa ${_left(p)})'
+                  : '${p.name}  (HABIS)',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: _left(p) > 0 ? null : OpTheme.textMuted),
+            ),
+          ),
+      ],
+      onChanged: _onPrizeChanged,
     );
   }
 
@@ -281,27 +356,16 @@ class _ManualTabState extends State<ManualTab> {
           DetailRow('Range kupon',
               '${Account.formatCoupon(a.couponStart, _couponWidth)} – ${Account.formatCoupon(a.couponEnd, _couponWidth)}'),
           const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<Prize>(
-                  initialValue: _prize,
-                  decoration: OpTheme.input('Hadiah untuk kupon ini'),
-                  items: [
-                    for (final p in _prizes)
-                      DropdownMenuItem(value: p, child: Text(p.name)),
-                  ],
-                  onChanged: (v) => setState(() => _prize = v),
-                ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                onPressed: (_busy || _prize == null) ? null : () => _submit(),
-                style: OpTheme.goldButton,
-                icon: const Icon(Icons.present_to_all),
-                label: const Text('Tampilkan ke Layar'),
-              ),
-            ],
+          FilledButton.icon(
+            onPressed: (_busy || _prize == null) ? null : () => _submit(),
+            style: OpTheme.goldButton.copyWith(
+              minimumSize:
+                  WidgetStateProperty.all(const Size(double.infinity, 56)),
+            ),
+            icon: const Icon(Icons.present_to_all),
+            label: Text(_prize == null
+                ? 'Tampilkan ke Layar'
+                : 'Tampilkan ke Layar — ${_prize!.name}'),
           ),
         ],
       ),

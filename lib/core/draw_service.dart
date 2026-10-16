@@ -54,6 +54,8 @@ class DrawService {
   }
 
   /// Catat pemenang: insert winners + tandai rekening menang.
+  /// Menolak (StateError) bila kuota hadiah sudah habis — pengaman
+  /// lapis kedua selain dropdown yang menonaktifkan hadiah habis.
   Future<void> recordWinner({
     required int couponNo,
     required int accountId,
@@ -61,6 +63,15 @@ class DrawService {
     required String mode,
   }) async {
     final db = DatabaseHelper.instance;
+    final prizes = await db.getPrizes();
+    final prize = prizes.where((p) => p.id == prizeId).firstOrNull;
+    if (prize == null) {
+      throw StateError('Hadiah tidak ditemukan.');
+    }
+    final won = await db.winnerCountForPrize(prizeId);
+    if (won >= prize.qty) {
+      throw StateError('Hadiah "${prize.name}" sudah habis.');
+    }
     await db.insertWinner(Winner(
       couponNo: couponNo,
       accountId: accountId,

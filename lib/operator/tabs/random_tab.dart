@@ -19,6 +19,7 @@ class _RandomTabState extends State<RandomTab> {
   final _svc = DrawService();
   List<Prize> _prizes = [];
   Prize? _prize;
+  Map<int, int> _remaining = {};
   DrawResult? _drawn;
   bool _busy = false;
   int _pool = 0;
@@ -31,21 +32,44 @@ class _RandomTabState extends State<RandomTab> {
     _refresh();
   }
 
+  int _left(Prize p) => _remaining[p.id] ?? p.qty;
+
   Future<void> _refresh() async {
     final db = DatabaseHelper.instance;
     final prizes = await db.getPrizes();
     final pool = await db.totalCoupons();
     final winners = (await db.getWinners()).length;
+    final remaining = <int, int>{};
+    for (final p in prizes) {
+      remaining[p.id!] = p.qty - await db.winnerCountForPrize(p.id!);
+    }
     if (!mounted) return;
     setState(() {
       _prizes = prizes;
+      _remaining = remaining;
       _pool = pool;
       _winners = winners;
       _couponWidth = pool.toString().length.clamp(6, 12);
-      if (_prize == null || !prizes.any((p) => p.id == _prize!.id)) {
-        _prize = prizes.isNotEmpty ? prizes.first : null;
+      if (_prize == null ||
+          !prizes.any((p) => p.id == _prize!.id) ||
+          _left(_prize!) <= 0) {
+        _prize = null;
+        for (final p in prizes) {
+          if (_left(p) > 0) {
+            _prize = p;
+            break;
+          }
+        }
       }
     });
+  }
+
+  void _onPrizeChanged(Prize? p) {
+    setState(() => _prize = p);
+    if (p != null) {
+      AudienceChannel.send(
+          AudienceProtocol.showPrize, {AudienceProtocol.argHadiah: p.name});
+    }
   }
 
   Future<void> _shuffle() async {
@@ -101,6 +125,13 @@ class _RandomTabState extends State<RandomTab> {
       );
       setState(() => _drawn = null);
       await _refresh();
+    } on StateError catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: OpTheme.danger),
+        );
+        await _refresh();
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -154,9 +185,20 @@ class _RandomTabState extends State<RandomTab> {
                   decoration: OpTheme.input('Hadiah yang diundi sekarang'),
                   items: [
                     for (final p in _prizes)
-                      DropdownMenuItem(value: p, child: Text(p.name)),
+                      DropdownMenuItem(
+                        value: p,
+                        enabled: _left(p) > 0,
+                        child: Text(
+                          _left(p) > 0
+                              ? '${p.name}  (sisa ${_left(p)})'
+                              : '${p.name}  (HABIS)',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: _left(p) > 0 ? null : OpTheme.textMuted),
+                        ),
+                      ),
                   ],
-                  onChanged: (v) => setState(() => _prize = v),
+                  onChanged: _onPrizeChanged,
                 ),
               ),
               const SizedBox(width: 12),

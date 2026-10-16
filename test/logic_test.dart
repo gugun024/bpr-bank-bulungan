@@ -103,6 +103,49 @@ void main() {
     expect(v.totalCoupons, 69);
   });
 
+  test('recordWinner menolak hadiah yang sudah habis', () async {
+    final db = DatabaseHelper.instance;
+    await db.replaceAllAccounts([
+      Account(
+          rekening: '01.13.097863.001',
+          rekeningLama: '',
+          nama: 'fazli',
+          alamat: '',
+          saldo: 6889777,
+          kuponCount: 68,
+          couponStart: 1,
+          couponEnd: 68),
+      Account(
+          rekening: '02.22.000001.001',
+          rekeningLama: '',
+          nama: 'budi',
+          alamat: '',
+          saldo: 190000,
+          kuponCount: 1,
+          couponStart: 69,
+          couponEnd: 69),
+    ]);
+    final prizeId =
+        await db.insertPrize(const Prize(name: 'Sepeda', urutan: 1, qty: 1));
+    final svc = DrawService();
+    final acc1 = (await db.findByCoupon(1))!;
+    final acc2 = (await db.findByCoupon(69))!;
+
+    // Kuota 1: pemenang pertama lolos.
+    await svc.recordWinner(
+        couponNo: 1, accountId: acc1.id!, prizeId: prizeId, mode: 'manual');
+    expect(await db.winnerCountForPrize(prizeId), 1);
+
+    // Pemenang kedua untuk hadiah yang sama DITOLAK.
+    await expectLater(
+      svc.recordWinner(
+          couponNo: 69, accountId: acc2.id!, prizeId: prizeId, mode: 'manual'),
+      throwsA(isA<StateError>()),
+    );
+    expect(await db.winnerCountForPrize(prizeId), 1);
+    expect((await db.findByCoupon(69))?.hasWon, isFalse);
+  });
+
   test('alur undian: import -> lookup -> menang -> eksklusi -> random',
       () async {
     final db = DatabaseHelper.instance;
