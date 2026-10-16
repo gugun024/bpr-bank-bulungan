@@ -95,6 +95,38 @@ class DatabaseHelper {
     return (r.first['c'] as int?) ?? 0;
   }
 
+  /// Jumlah rekening dengan filter pencarian (nama / no. rekening).
+  Future<int> countAccountsFiltered(String query) async {
+    final d = await db;
+    final q = query.trim();
+    if (q.isEmpty) return countAccounts();
+    final r = await d.rawQuery(
+      'SELECT COUNT(*) AS c FROM accounts WHERE nama LIKE ? OR rekening LIKE ?',
+      ['%$q%', '%$q%'],
+    );
+    return (r.first['c'] as int?) ?? 0;
+  }
+
+  /// Satu halaman data rekening untuk tabel Data Nasabah,
+  /// diurutkan mengikuti nomor kupon.
+  Future<List<Account>> getAccountsPage({
+    required int limit,
+    required int offset,
+    String query = '',
+  }) async {
+    final d = await db;
+    final q = query.trim();
+    final r = await d.query(
+      'accounts',
+      where: q.isEmpty ? null : 'nama LIKE ? OR rekening LIKE ?',
+      whereArgs: q.isEmpty ? null : ['%$q%', '%$q%'],
+      orderBy: 'coupon_start ASC',
+      limit: limit,
+      offset: offset,
+    );
+    return r.map(Account.fromMap).toList();
+  }
+
   Future<int> totalCoupons() async {
     final d = await db;
     final r = await d.rawQuery(

@@ -182,6 +182,42 @@ void main() {
     expect((await db.findByCoupon(69))?.hasWon, isFalse);
   });
 
+  test('paginasi & pencarian Data Nasabah', () async {
+    final db = DatabaseHelper.instance;
+    await db.replaceAllAccounts([
+      for (var i = 0; i < 5; i++)
+        Account(
+            rekening: '01.13.00000$i.00',
+            rekeningLama: '',
+            nama: i == 3 ? 'Budi Santoso' : 'Nasabah $i',
+            alamat: '',
+            saldo: (i + 1) * 100000,
+            kuponCount: i + 1,
+            couponStart: i * 10 + 1,
+            couponEnd: (i + 1) * 10),
+    ]);
+
+    expect(await db.countAccountsFiltered(''), 5);
+    expect(await db.countAccountsFiltered('budi'), 1);
+    expect(await db.countAccountsFiltered('01.13.000002'), 1);
+    expect(await db.countAccountsFiltered('tidak-ada'), 0);
+
+    final p1 = await db.getAccountsPage(limit: 2, offset: 0);
+    final p2 = await db.getAccountsPage(limit: 2, offset: 2);
+    final p3 = await db.getAccountsPage(limit: 2, offset: 4);
+    expect(p1.length, 2);
+    expect(p2.length, 2);
+    expect(p3.length, 1);
+    // Urut mengikuti nomor kupon, tidak ada yang terlewat/ganda.
+    final all = [...p1, ...p2, ...p3].map((a) => a.rekening).toList();
+    expect(all.toSet().length, 5);
+
+    final cari = await db.getAccountsPage(
+        limit: 10, offset: 0, query: 'santoso');
+    expect(cari.length, 1);
+    expect(cari.first.nama, 'Budi Santoso');
+  });
+
   test('alur undian: import -> lookup -> menang -> eksklusi -> random',
       () async {
     final db = DatabaseHelper.instance;

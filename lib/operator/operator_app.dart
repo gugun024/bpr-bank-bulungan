@@ -4,8 +4,8 @@ import 'package:window_manager/window_manager.dart';
 
 import '../shared/protocol.dart';
 import '../shared/theme.dart';
+import 'tabs/data_tab.dart';
 import 'tabs/history_tab.dart';
-import 'tabs/import_tab.dart';
 import 'tabs/manual_tab.dart';
 import 'tabs/prizes_tab.dart';
 import 'tabs/random_tab.dart';
@@ -94,8 +94,8 @@ class _OperatorAppState extends State<OperatorApp> {
       const _Tab('Undi Manual', Icons.keyboard, ManualTab()),
       const _Tab('Undi Random', Icons.casino, RandomTab()),
       const _Tab('Hadiah', Icons.card_giftcard, PrizesTab()),
+      const _Tab('Data Nasabah', Icons.people, DataTab()),
       const _Tab('Riwayat', Icons.history, HistoryTab()),
-      const _Tab('Import Data', Icons.upload_file, ImportTab()),
     ];
     return MaterialApp(
       debugShowCheckedModeBanner: false,
