@@ -71,7 +71,8 @@ class ImportService {
   static ColumnMapping autoMap(List<String> headers) {
     final m = ColumnMapping();
     for (var i = 0; i < headers.length; i++) {
-      final h = headers[i].toLowerCase().replaceAll(RegExp(r'[^a-z ]'), ' ');
+      var h = headers[i].toLowerCase().replaceAll(RegExp(r'[^a-z ]'), ' ');
+      h = h.replaceAll(RegExp(r'\brek\b'), 'rekening'); // "Rek. Lama"
       final hs = ' $h ';
       if (hs.contains('rekening') && hs.contains('lama')) {
         m.rekeningLama = i;
@@ -92,16 +93,27 @@ class ImportService {
     return m;
   }
 
-  /// Parse format saldo Indonesia: "6.889.777", "6889777", "6,889,777", "6.889.777,00".
+  /// Parse format saldo Indonesia maupun Inggris:
+  /// "6.889.777", "6,889,777", "6889777", "6.889.777,00", "6,889,777.00".
+  /// Bila hanya satu jenis pemisah: dianggap ribuan bila tiap grup setelah
+  /// grup pertama tepat 3 digit ("6,889,777"), selain itu dianggap desimal
+  /// ("6889,77" -> 6889). Desimal selalu dibuang (floor).
   static int parseSaldo(String s) {
     var t = s.trim().replaceAll(RegExp(r'[^0-9.,]'), '');
     if (t.isEmpty) return 0;
-    if (t.contains(',')) {
-      // Format Indonesia: titik = ribuan, koma = desimal → buang desimal.
-      t = t.split(',').first.replaceAll('.', '');
-    } else if (t.contains('.')) {
-      // Hanya titik → anggap pemisah ribuan.
-      t = t.replaceAll('.', '');
+    if (t.contains('.') && t.contains(',')) {
+      // Kedua pemisah ada: yang TERAKHIR adalah desimal.
+      if (t.lastIndexOf('.') > t.lastIndexOf(',')) {
+        t = t.replaceAll(',', '').split('.').first; // "6,889,777.00"
+      } else {
+        t = t.replaceAll('.', '').split(',').first; // "6.889.777,00"
+      }
+    } else if (t.contains(',') || t.contains('.')) {
+      final sep = t.contains(',') ? ',' : '.';
+      final parts = t.split(sep).where((p) => p.isNotEmpty).toList();
+      final thousands =
+          parts.length > 1 && parts.skip(1).every((p) => p.length == 3);
+      t = thousands ? parts.join() : parts.first;
     }
     return int.tryParse(t) ?? 0;
   }

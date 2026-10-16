@@ -24,6 +24,15 @@ void main() {
     expect(ImportService.parseSaldo('190.000'), 190000);
     expect(ImportService.parseSaldo('1.234.567.890'), 1234567890);
     expect(ImportService.parseSaldo(''), 0);
+    // Format Inggris (koma = ribuan) — dipakai file kupon_SIMAPAN.csv.
+    expect(ImportService.parseSaldo('6,889,777'), 6889777);
+    expect(ImportService.parseSaldo('190,000'), 190000);
+    expect(ImportService.parseSaldo('1,234,567,890'), 1234567890);
+    // Campuran + desimal selalu dibuang.
+    expect(ImportService.parseSaldo('6.889.777,00'), 6889777);
+    expect(ImportService.parseSaldo('6,889,777.00'), 6889777);
+    expect(ImportService.parseSaldo('6889777'), 6889777);
+    expect(ImportService.parseSaldo('6889,77'), 6889);
     expect(ImportService.kuponCount(6889777), 68);
     expect(ImportService.kuponCount(190000), 1);
     expect(ImportService.kuponCount(199999), 1);
@@ -39,6 +48,17 @@ void main() {
     expect(DrawService.normalizeCouponInput('  000123  '), 123);
     expect(DrawService.normalizeCouponInput('abc'), isNull);
     expect(DrawService.normalizeCouponInput('0'), isNull);
+  });
+
+  test('autoMap mengenali header singkatan Rek. Lama', () {
+    final m = ImportService.autoMap(
+        ['No', 'Rekening', 'Rek. Lama', 'Nama', 'Alamat', 'Saldo', 'Kupon']);
+    expect(m.rekening, 1);
+    expect(m.rekeningLama, 2);
+    expect(m.nama, 3);
+    expect(m.alamat, 4);
+    expect(m.saldo, 5);
+    expect(m.kupon, 6);
   });
 
   test('validasi import: duplikat rekening & kupon tidak cocok', () {
@@ -110,8 +130,7 @@ void main() {
     // 1080p fullscreen -> 1.0 (tidak berubah dari desain awal)
     expect(audienceScaleFor(const Size(1920, 1080)), 1.0);
     // Proyektor 720p -> mengecil proporsional
-    expect(audienceScaleFor(const Size(1280, 720)),
-        closeTo(0.6667, 0.001));
+    expect(audienceScaleFor(const Size(1280, 720)), closeTo(0.6667, 0.001));
     // Laptop 1366x768 -> ikut sisi terkecil
     expect(audienceScaleFor(const Size(1366, 768)), closeTo(0.7111, 0.001));
     // 4K -> dibatasi 1.6
