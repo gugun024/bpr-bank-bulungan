@@ -511,37 +511,61 @@ class _AnimatedWinnerView extends StatefulWidget {
 }
 
 class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
+    with TickerProviderStateMixin {
+  late final AnimationController _roll; // slot-machine nomor (2.6 dtk)
+  late final CurvedAnimation _rollCurve; // easeOut = melambat di akhir
+  late final AnimationController _reveal; // kartu nama + confetti
   late final List<_Confetti> _pieces;
   final _rand = Random();
+  bool _locked = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 4500))
-      ..forward();
+    _roll = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 2600));
+    _rollCurve = CurvedAnimation(parent: _roll, curve: Curves.easeOutQuart);
+    _reveal = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 4500));
+    _roll.addStatusListener((s) {
+      if (s == AnimationStatus.completed && mounted) {
+        setState(() => _locked = true);
+        _reveal.forward();
+      }
+    });
     _pieces = List.generate(90, (_) => _Confetti.random(_rand));
+    _roll.forward();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _roll.dispose();
+    _reveal.dispose();
     super.dispose();
+  }
+
+  /// Nomor acak semu per tick (deterministik agar stabil per frame).
+  String _rollNumber(int tick) {
+    final len = widget.coupon.length;
+    var max = 1;
+    for (var i = 0; i < len; i++) {
+      max *= 10;
+    }
+    final n = Random(tick * 7919 + 13).nextInt(max);
+    return n.toString().padLeft(len, '0');
   }
 
   @override
   Widget build(BuildContext context) {
     final entrance = CurvedAnimation(
-      parent: _controller,
+      parent: _reveal,
       curve: const Interval(0.0, 0.3, curve: Curves.easeOutBack),
     );
     return Stack(
       children: [
         Positioned.fill(
           child: CustomPaint(
-            painter: _ConfettiPainter(_controller, _pieces),
+            painter: _ConfettiPainter(_reveal, _pieces),
           ),
         ),
         Center(
@@ -550,7 +574,7 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
             children: [
               FadeTransition(
                 opacity: CurvedAnimation(
-                    parent: _controller, curve: const Interval(0.0, 0.25)),
+                    parent: _roll, curve: const Interval(0.0, 0.25)),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -562,65 +586,102 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                   ],
                 ),
               ),
-              const SizedBox(height: 56),
+              const SizedBox(height: 44),
+              // Kotak nomor: ng-roll seperti mesin slot, lalu mengunci.
+              AnimatedBuilder(
+                animation: Listenable.merge([_roll, _reveal]),
+                builder: (context, _) {
+                  final tick = (_rollCurve.value * 45).floor();
+                  final text = _locked ? widget.coupon : _rollNumber(tick);
+                  double scale = 1.0;
+                  if (_locked) {
+                    final p = (_reveal.value / 0.12).clamp(0.0, 1.0);
+                    scale = 1.35 - 0.35 * Curves.easeOut.transform(p);
+                  }
+                  return Transform.scale(
+                    scale: scale,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 64, vertical: 28),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            AudienceTheme.goldDark,
+                            AudienceTheme.gold,
+                            AudienceTheme.goldDark
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: const [
+                          BoxShadow(
+                              color: Color(0x66000000),
+                              blurRadius: 40,
+                              offset: Offset(0, 14)),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'NOMOR KUPON',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 10,
+                              color: AudienceTheme.navy800,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            text,
+                            style: const TextStyle(
+                              fontSize: 108,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 14,
+                              color: AudienceTheme.navy900,
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 36),
+              // Kartu nama muncul setelah nomor mengunci (layout tetap
+              // di-reserve agar tidak ada lompatan).
               ScaleTransition(
                 scale: Tween<double>(begin: 0.6, end: 1.0).animate(entrance),
                 child: FadeTransition(
                   opacity: CurvedAnimation(
-                      parent: _controller, curve: const Interval(0.1, 0.35)),
+                      parent: _reveal, curve: const Interval(0.1, 0.35)),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 88, vertical: 36),
+                        horizontal: 72, vertical: 26),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          AudienceTheme.goldDark,
-                          AudienceTheme.gold,
-                          AudienceTheme.goldDark
-                        ],
-                      ),
+                      border: Border.all(color: AudienceTheme.gold, width: 2),
                       borderRadius: BorderRadius.circular(20),
-                      boxShadow: const [
-                        BoxShadow(
-                            color: Color(0x66000000),
-                            blurRadius: 32,
-                            offset: Offset(0, 12)),
-                      ],
+                      color: const Color(0x22000000),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.nama.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 64,
-                            fontWeight: FontWeight.w800,
-                            color: AudienceTheme.navy900,
-                            letterSpacing: 4,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Kupon ${widget.coupon}',
-                          style: const TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w600,
-                            color: AudienceTheme.navy800,
-                            letterSpacing: 6,
-                            fontFeatures: [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      widget.nama.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 56,
+                        fontWeight: FontWeight.w800,
+                        color: AudienceTheme.goldLight,
+                        letterSpacing: 4,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
               if (widget.hadiah.isNotEmpty)
                 FadeTransition(
                   opacity: CurvedAnimation(
-                      parent: _controller, curve: const Interval(0.35, 0.55)),
+                      parent: _reveal, curve: const Interval(0.35, 0.55)),
                   child: _PrizeChipStatic(hadiah: widget.hadiah),
                 ),
             ],
@@ -662,6 +723,7 @@ class _ConfettiPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final t = controller.value;
+    if (t <= 0) return; // belum mulai reveal (masih fase roll nomor)
     final paint = Paint();
     for (final c in pieces) {
       final yFrac = (c.y0 + t * c.speed) % 1.35;
