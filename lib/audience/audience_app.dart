@@ -24,6 +24,18 @@ class AudienceApp extends StatefulWidget {
 
 enum _Stage { idle, shuffle, winner }
 
+/// Faktor skala responsif untuk layar penonton: 1.0 pada 1920x1080,
+/// mengecil di proyektor 720p, membesar di 4K (dibatasi 0.5–1.6).
+double audienceScaleFor(Size size) {
+  final s = size.width / 1920 < size.height / 1080
+      ? size.width / 1920
+      : size.height / 1080;
+  return s.clamp(0.5, 1.6);
+}
+
+double audienceScale(BuildContext context) =>
+    audienceScaleFor(MediaQuery.sizeOf(context));
+
 class _AudienceAppState extends State<AudienceApp> with WindowListener {
   _Stage _stage = _Stage.idle;
   String _coupon = '';
@@ -132,6 +144,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
+    final s = audienceScale(context);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
@@ -139,12 +152,12 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           decoration: AudienceTheme.background(),
           child: Stack(
             children: [
-              const _GoldGlow(),
+              _GoldGlow(scale: s),
               Center(
                 child: switch (_stage) {
-                  _Stage.idle => _idleView(),
-                  _Stage.shuffle => _shuffleView(),
-                  _Stage.winner => _winnerView(),
+                  _Stage.idle => _idleView(s),
+                  _Stage.shuffle => _shuffleView(s),
+                  _Stage.winner => _winnerView(s),
                 },
               ),
             ],
@@ -154,45 +167,46 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
     );
   }
 
-  Widget _idleView() => _AnimatedIdleView(hadiah: _hadiah);
+  Widget _idleView(double s) => _AnimatedIdleView(hadiah: _hadiah, scale: s);
 
-  Widget _shuffleView() => Column(
+  Widget _shuffleView(double s) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('MENGUNDI', style: AudienceTheme.title(64)),
-          const SizedBox(height: 16),
-          if (_hadiah.isNotEmpty) _prizeChip(_hadiah),
-          const SizedBox(height: 48),
+          Text('MENGUNDI', style: AudienceTheme.title(64 * s)),
+          SizedBox(height: 16 * s),
+          if (_hadiah.isNotEmpty) _prizeChip(s, _hadiah),
+          SizedBox(height: 48 * s),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 72, vertical: 32),
+            padding: EdgeInsets.symmetric(horizontal: 72 * s, vertical: 32 * s),
             decoration: BoxDecoration(
               border: Border.all(color: AudienceTheme.gold, width: 3),
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(24 * s),
               color: const Color(0x22000000),
             ),
             child: Text(
               _rolling,
-              style: const TextStyle(
-                fontSize: 120,
+              style: TextStyle(
+                fontSize: 120 * s,
                 fontWeight: FontWeight.w900,
-                letterSpacing: 16,
+                letterSpacing: 16 * s,
                 color: AudienceTheme.goldLight,
-                fontFeatures: [FontFeature.tabularFigures()],
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),
         ],
       );
 
-  Widget _winnerView() => _AnimatedWinnerView(
+  Widget _winnerView(double s) => _AnimatedWinnerView(
         key: ValueKey('winner-$_coupon'),
         nama: _nama,
         coupon: _coupon,
         hadiah: _hadiah,
+        scale: s,
       );
 
-  Widget _prizeChip(String hadiah) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+  Widget _prizeChip(double s, String hadiah) => Container(
+        padding: EdgeInsets.symmetric(horizontal: 40 * s, vertical: 16 * s),
         decoration: BoxDecoration(
           border: Border.all(color: AudienceTheme.gold, width: 2),
           borderRadius: BorderRadius.circular(999),
@@ -200,11 +214,11 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         ),
         child: Text(
           hadiah,
-          style: const TextStyle(
-            fontSize: 32,
+          style: TextStyle(
+            fontSize: 32 * s,
             fontWeight: FontWeight.w600,
             color: AudienceTheme.goldLight,
-            letterSpacing: 2,
+            letterSpacing: 2 * s,
           ),
         ),
       );
@@ -212,21 +226,22 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
 
 /// Dekorasi cahaya emas sederhana di latar.
 class _GoldGlow extends StatelessWidget {
-  const _GoldGlow();
+  final double scale;
+  const _GoldGlow({this.scale = 1.0});
 
   @override
   Widget build(BuildContext context) {
-    return const Stack(
+    return Stack(
       children: [
         Positioned(
-          top: -120,
-          left: -80,
-          child: _Blur(color: Color(0x44D4AF37), size: 420),
+          top: -120 * scale,
+          left: -80 * scale,
+          child: _Blur(color: const Color(0x44D4AF37), size: 420 * scale),
         ),
         Positioned(
-          bottom: -140,
-          right: -60,
-          child: _Blur(color: Color(0x332A4A8F), size: 480),
+          bottom: -140 * scale,
+          right: -60 * scale,
+          child: _Blur(color: const Color(0x332A4A8F), size: 480 * scale),
         ),
       ],
     );
@@ -254,7 +269,8 @@ class _Blur extends StatelessWidget {
 /// Layar idle animasi: partikel emas melayang, judul shimmer, glow berdenyut.
 class _AnimatedIdleView extends StatefulWidget {
   final String hadiah;
-  const _AnimatedIdleView({required this.hadiah});
+  final double scale;
+  const _AnimatedIdleView({required this.hadiah, this.scale = 1.0});
 
   @override
   State<_AnimatedIdleView> createState() => _AnimatedIdleViewState();
@@ -298,16 +314,17 @@ class _AnimatedIdleViewState extends State<_AnimatedIdleView>
 
   @override
   Widget build(BuildContext context) {
+    final s = widget.scale;
     return Stack(
       children: [
         // Glow berdenyut.
         AnimatedBuilder(
           animation: _pulse,
           builder: (context, child) {
-            final s = 1.0 + _pulse.value * 0.18;
-            return Transform.scale(scale: s, child: child);
+            final sc = 1.0 + _pulse.value * 0.18;
+            return Transform.scale(scale: sc, child: child);
           },
-          child: const _GoldGlow(),
+          child: _GoldGlow(scale: s),
         ),
         // Partikel emas melayang.
         Positioned.fill(
@@ -319,18 +336,18 @@ class _AnimatedIdleViewState extends State<_AnimatedIdleView>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 'PT. BPR BANK BULUNGAN',
                 style: TextStyle(
-                  fontSize: 30,
+                  fontSize: 30 * s,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: 12,
+                  letterSpacing: 12 * s,
                   color: AudienceTheme.goldLight,
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16 * s),
               Container(
-                width: 220,
+                width: 220 * s,
                 height: 2,
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(colors: [
@@ -340,7 +357,7 @@ class _AnimatedIdleViewState extends State<_AnimatedIdleView>
                   ]),
                 ),
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: 32 * s),
               // Judul dengan efek shimmer emas.
               AnimatedBuilder(
                 animation: _shimmer,
@@ -361,22 +378,22 @@ class _AnimatedIdleViewState extends State<_AnimatedIdleView>
                     child: child,
                   );
                 },
-                child:
-                    Text('PENGUNDIAN HADIAH', style: AudienceTheme.title(84)),
+                child: Text('PENGUNDIAN HADIAH',
+                    style: AudienceTheme.title(84 * s)),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24 * s),
               // "SEGERA DIMULAI" + titik animasi.
               AnimatedBuilder(
                 animation: _dots,
                 builder: (context, _) {
                   final n = 1 + (_dots.value * 2.999).floor();
                   return Text('SEGERA DIMULAI${'.' * n}',
-                      style: AudienceTheme.subtitle(30));
+                      style: AudienceTheme.subtitle(30 * s));
                 },
               ),
               if (widget.hadiah.isNotEmpty) ...[
-                const SizedBox(height: 48),
-                _FloatingPrizeChip(hadiah: widget.hadiah),
+                SizedBox(height: 48 * s),
+                _FloatingPrizeChip(hadiah: widget.hadiah, scale: s),
               ],
             ],
           ),
@@ -389,7 +406,8 @@ class _AnimatedIdleViewState extends State<_AnimatedIdleView>
 /// Chip hadiah yang mengambang lembut.
 class _FloatingPrizeChip extends StatefulWidget {
   final String hadiah;
-  const _FloatingPrizeChip({required this.hadiah});
+  final double scale;
+  const _FloatingPrizeChip({required this.hadiah, this.scale = 1.0});
 
   @override
   State<_FloatingPrizeChip> createState() => _FloatingPrizeChipState();
@@ -418,8 +436,8 @@ class _FloatingPrizeChipState extends State<_FloatingPrizeChip>
     return AnimatedBuilder(
       animation: _float,
       builder: (context, _) => Transform.translate(
-        offset: Offset(0, -8 * _float.value),
-        child: _PrizeChipStatic(hadiah: widget.hadiah),
+        offset: Offset(0, -8 * widget.scale * _float.value),
+        child: _PrizeChipStatic(hadiah: widget.hadiah, scale: widget.scale),
       ),
     );
   }
@@ -427,12 +445,14 @@ class _FloatingPrizeChipState extends State<_FloatingPrizeChip>
 
 class _PrizeChipStatic extends StatelessWidget {
   final String hadiah;
-  const _PrizeChipStatic({required this.hadiah});
+  final double scale;
+  const _PrizeChipStatic({required this.hadiah, this.scale = 1.0});
 
   @override
   Widget build(BuildContext context) {
+    final s = scale;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+      padding: EdgeInsets.symmetric(horizontal: 40 * s, vertical: 16 * s),
       decoration: BoxDecoration(
         border: Border.all(color: AudienceTheme.gold, width: 2),
         borderRadius: BorderRadius.circular(999),
@@ -440,11 +460,11 @@ class _PrizeChipStatic extends StatelessWidget {
       ),
       child: Text(
         hadiah,
-        style: const TextStyle(
-          fontSize: 32,
+        style: TextStyle(
+          fontSize: 32 * s,
           fontWeight: FontWeight.w600,
           color: AudienceTheme.goldLight,
-          letterSpacing: 2,
+          letterSpacing: 2 * s,
         ),
       ),
     );
@@ -500,11 +520,13 @@ class _AnimatedWinnerView extends StatefulWidget {
   final String nama;
   final String coupon;
   final String hadiah;
+  final double scale;
   const _AnimatedWinnerView(
       {super.key,
       required this.nama,
       required this.coupon,
-      required this.hadiah});
+      required this.hadiah,
+      this.scale = 1.0});
 
   @override
   State<_AnimatedWinnerView> createState() => _AnimatedWinnerViewState();
@@ -557,6 +579,7 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
 
   @override
   Widget build(BuildContext context) {
+    final s = widget.scale;
     final entrance = CurvedAnimation(
       parent: _reveal,
       curve: const Interval(0.0, 0.3, curve: Curves.easeOutBack),
@@ -578,15 +601,15 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('SELAMAT KEPADA', style: AudienceTheme.title(52)),
-                    Text('PEMENANG', style: AudienceTheme.title(96)),
-                    const SizedBox(height: 12),
+                    Text('SELAMAT KEPADA', style: AudienceTheme.title(52 * s)),
+                    Text('PEMENANG', style: AudienceTheme.title(96 * s)),
+                    SizedBox(height: 12 * s),
                     Text('PT. BPR Bank Bulungan',
-                        style: AudienceTheme.subtitle(26)),
+                        style: AudienceTheme.subtitle(26 * s)),
                   ],
                 ),
               ),
-              const SizedBox(height: 44),
+              SizedBox(height: 44 * s),
               // Kotak nomor: ng-roll seperti mesin slot, lalu mengunci.
               AnimatedBuilder(
                 animation: Listenable.merge([_roll, _reveal]),
@@ -601,8 +624,8 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                   return Transform.scale(
                     scale: scale,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 64, vertical: 28),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 64 * s, vertical: 28 * s),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [
@@ -611,7 +634,7 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                             AudienceTheme.goldDark
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(24 * s),
                         boxShadow: const [
                           BoxShadow(
                               color: Color(0x66000000),
@@ -622,24 +645,26 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
+                          Text(
                             'NOMOR KUPON',
                             style: TextStyle(
-                              fontSize: 20,
+                              fontSize: 20 * s,
                               fontWeight: FontWeight.w700,
-                              letterSpacing: 10,
+                              letterSpacing: 10 * s,
                               color: AudienceTheme.navy800,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: 8 * s),
                           Text(
                             text,
-                            style: const TextStyle(
-                              fontSize: 108,
+                            style: TextStyle(
+                              fontSize: 108 * s,
                               fontWeight: FontWeight.w900,
-                              letterSpacing: 14,
+                              letterSpacing: 14 * s,
                               color: AudienceTheme.navy900,
-                              fontFeatures: [FontFeature.tabularFigures()],
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
                             ),
                           ),
                         ],
@@ -648,7 +673,7 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                   );
                 },
               ),
-              const SizedBox(height: 36),
+              SizedBox(height: 36 * s),
               // Kartu nama muncul setelah nomor mengunci (layout tetap
               // di-reserve agar tidak ada lompatan).
               ScaleTransition(
@@ -657,32 +682,32 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                   opacity: CurvedAnimation(
                       parent: _reveal, curve: const Interval(0.1, 0.35)),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 72, vertical: 26),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 72 * s, vertical: 26 * s),
                     decoration: BoxDecoration(
                       border: Border.all(color: AudienceTheme.gold, width: 2),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(20 * s),
                       color: const Color(0x22000000),
                     ),
                     child: Text(
                       widget.nama.toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 56,
+                      style: TextStyle(
+                        fontSize: 56 * s,
                         fontWeight: FontWeight.w800,
                         color: AudienceTheme.goldLight,
-                        letterSpacing: 4,
+                        letterSpacing: 4 * s,
                       ),
                       textAlign: TextAlign.center,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: 32 * s),
               if (widget.hadiah.isNotEmpty)
                 FadeTransition(
                   opacity: CurvedAnimation(
                       parent: _reveal, curve: const Interval(0.35, 0.55)),
-                  child: _PrizeChipStatic(hadiah: widget.hadiah),
+                  child: _PrizeChipStatic(hadiah: widget.hadiah, scale: s),
                 ),
             ],
           ),

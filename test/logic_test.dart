@@ -1,5 +1,8 @@
+import 'dart:ui';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:undian_bank/audience/audience_app.dart';
 import 'package:undian_bank/core/database.dart';
 import 'package:undian_bank/core/draw_service.dart';
 import 'package:undian_bank/core/import_service.dart';
@@ -101,6 +104,20 @@ void main() {
     expect(v.isClean, isTrue);
     expect(v.validAccounts, 2);
     expect(v.totalCoupons, 69);
+  });
+
+  test('skala responsif layar penonton', () {
+    // 1080p fullscreen -> 1.0 (tidak berubah dari desain awal)
+    expect(audienceScaleFor(const Size(1920, 1080)), 1.0);
+    // Proyektor 720p -> mengecil proporsional
+    expect(audienceScaleFor(const Size(1280, 720)),
+        closeTo(0.6667, 0.001));
+    // Laptop 1366x768 -> ikut sisi terkecil
+    expect(audienceScaleFor(const Size(1366, 768)), closeTo(0.7111, 0.001));
+    // 4K -> dibatasi 1.6
+    expect(audienceScaleFor(const Size(3840, 2160)), 1.6);
+    // Jendela sangat kecil -> dibatasi 0.5
+    expect(audienceScaleFor(const Size(800, 600)), 0.5);
   });
 
   test('recordWinner menolak hadiah yang sudah habis', () async {
