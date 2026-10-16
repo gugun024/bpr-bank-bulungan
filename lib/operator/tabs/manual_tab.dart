@@ -190,14 +190,17 @@ class _ManualTabState extends State<ManualTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Expanded(child: _prizeDropdown()),
-                  const SizedBox(width: 12),
-                  if (_prize != null)
-                    StatusBadge('Sisa ${_left(_prize!)}',
-                        fg: OpTheme.success, bg: OpTheme.successSoft),
-                ],
+              const Text('Hadiah yang diundi',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: OpTheme.navy)),
+              const SizedBox(height: 8),
+              PrizePicker(
+                prizes: _prizes,
+                remainingOf: _left,
+                selected: _prize,
+                onChanged: _onPrizeChanged,
               ),
               const SizedBox(height: 14),
               Row(
@@ -255,31 +258,6 @@ class _ManualTabState extends State<ManualTab> {
           _banner(_rejectedInfo!, OpTheme.danger, Icons.block, big: true),
         if (_found != null) _accountCard(_found!),
       ],
-    );
-  }
-
-  /// Dropdown hadiah dengan sisa kuota; hadiah habis tidak bisa dipilih.
-  Widget _prizeDropdown() {
-    return DropdownButtonFormField<Prize>(
-      initialValue: _prize,
-      decoration: OpTheme.input('Hadiah yang diundi',
-          prefix:
-              const Icon(Icons.card_giftcard_outlined, color: OpTheme.navy)),
-      items: [
-        for (final p in _prizes)
-          DropdownMenuItem(
-            value: p,
-            enabled: _left(p) > 0,
-            child: Text(
-              _left(p) > 0
-                  ? '${p.name}  (sisa ${_left(p)})'
-                  : '${p.name}  (HABIS)',
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: _left(p) > 0 ? null : OpTheme.textMuted),
-            ),
-          ),
-      ],
-      onChanged: _onPrizeChanged,
     );
   }
 

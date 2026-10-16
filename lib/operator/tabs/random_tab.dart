@@ -176,38 +176,32 @@ class _RandomTabState extends State<RandomTab> {
         ),
         const SizedBox(height: 16),
         OpCard(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: DropdownButtonFormField<Prize>(
-                  initialValue: _prize,
-                  decoration: OpTheme.input('Hadiah yang diundi sekarang'),
-                  items: [
-                    for (final p in _prizes)
-                      DropdownMenuItem(
-                        value: p,
-                        enabled: _left(p) > 0,
-                        child: Text(
-                          _left(p) > 0
-                              ? '${p.name}  (sisa ${_left(p)})'
-                              : '${p.name}  (HABIS)',
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: _left(p) > 0 ? null : OpTheme.textMuted),
-                        ),
-                      ),
-                  ],
-                  onChanged: _onPrizeChanged,
-                ),
+              const Text('Hadiah yang diundi',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: OpTheme.navy)),
+              const SizedBox(height: 8),
+              PrizePicker(
+                prizes: _prizes,
+                remainingOf: _left,
+                selected: _prize,
+                onChanged: _onPrizeChanged,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed:
                     (_busy || _prize == null || _pool == 0) ? null : _shuffle,
-                style: OpTheme.primaryButton,
+                style: OpTheme.primaryButton.copyWith(
+                  minimumSize:
+                      WidgetStateProperty.all(const Size(double.infinity, 56)),
+                ),
                 icon: const Icon(Icons.casino),
-                label: const Text('Kocok'),
+                label:
+                    Text(_prize == null ? 'Kocok' : 'Kocok — ${_prize!.name}'),
               ),
             ],
           ),

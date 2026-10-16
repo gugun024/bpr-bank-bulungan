@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/models.dart';
 import '../../shared/theme.dart';
 
 /// Header standar tiap tab: judul + subjudul + tombol aksi di kanan.
@@ -292,6 +293,110 @@ class DetailRow extends StatelessWidget {
                     color: highlight ? OpTheme.navy : const Color(0xFF1E2A45))),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Pemilih hadiah sekali klik (chip): lebih cepat dari dropdown untuk
+/// operator saat acara live. Hadiah habis tampil abu-abu & tak bisa diklik.
+class PrizePicker extends StatelessWidget {
+  final List<Prize> prizes;
+  final int Function(Prize) remainingOf;
+  final Prize? selected;
+  final ValueChanged<Prize?> onChanged;
+
+  const PrizePicker({
+    super.key,
+    required this.prizes,
+    required this.remainingOf,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (prizes.isEmpty) {
+      return const Text('Belum ada hadiah. Tambahkan di tab Hadiah.',
+          style: TextStyle(color: OpTheme.textMuted, fontSize: 13));
+    }
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [for (final p in prizes) _chip(p)],
+    );
+  }
+
+  Widget _chip(Prize p) {
+    final left = remainingOf(p);
+    final done = left <= 0;
+    final sel = selected;
+    final isSel = sel != null && sel.id == p.id;
+    final String name = p.name;
+    return InkWell(
+      onTap: done ? null : () => onChanged(p),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSel
+              ? OpTheme.navy
+              : done
+                  ? const Color(0xFFF1F4F9)
+                  : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSel
+                ? OpTheme.gold
+                : done
+                    ? OpTheme.cardBorder
+                    : OpTheme.navy.withValues(alpha: 0.25),
+            width: isSel ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.card_giftcard,
+                size: 18,
+                color: isSel
+                    ? OpTheme.gold
+                    : done
+                        ? Colors.grey
+                        : OpTheme.navy),
+            const SizedBox(width: 8),
+            Text(name,
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: isSel
+                        ? Colors.white
+                        : done
+                            ? Colors.grey
+                            : OpTheme.navy)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: isSel
+                    ? OpTheme.gold
+                    : done
+                        ? Colors.grey.shade300
+                        : OpTheme.navySoft,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(done ? 'HABIS' : 'Sisa $left',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: isSel
+                          ? OpTheme.navyDark
+                          : done
+                              ? Colors.grey.shade700
+                              : OpTheme.navy)),
+            ),
+          ],
+        ),
       ),
     );
   }
