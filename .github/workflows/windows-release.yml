@@ -13,7 +13,6 @@ name: Build Windows Release
 on:
   push:
     branches: [main]
-    tags: ['v*']
     # Hemat: build hanya jalan kalau file kode berubah.
     # Edit README/docs saja -> workflow di-skip otomatis.
     paths:
@@ -23,6 +22,16 @@ on:
       - 'pubspec.lock'
       - '.github/workflows/**'
   workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Jenis kenaikan versi (patch=1.0.0→1.0.1, minor=1.0.0→1.1.0, major=1.0.0→2.0.0)'
+        required: true
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write # untuk membuat GitHub Release
@@ -42,6 +51,49 @@ jobs:
 
       - name: Flutter doctor
         run: flutter doctor -v
+
+      - name: Naikkan versi (patch/minor/major)
+        id: bump
+        if: github.event_name == 'workflow_dispatch'
+        shell: python
+        run: |
+          import os, pathlib, re
+          p = pathlib.Path("pubspec.yaml")
+          src = p.read_text(encoding="utf-8")
+          m = re.search(r"^version:\s*(\d+)\.(\d+)\.(\d+)(?:\+(\d+))?",
+                        src, re.M)
+          assert m, "format version di pubspec.yaml tidak dikenal"
+          major, minor, patch = (int(m.group(1)), int(m.group(2)),
+                                  int(m.group(3)))
+          build = int(m.group(4) or 0)
+          kind = "${{ inputs.bump }}"
+          if kind == "major":
+              major, minor, patch = major + 1, 0, 0
+          elif kind == "minor":
+              minor, patch = minor + 1, 0
+          else:
+              patch += 1
+          build += 1
+          new = f"{major}.{minor}.{patch}+{build}"
+          tag = f"v{major}.{minor}.{patch}"
+          src = re.sub(r"^version:\s*.*", f"version: {new}",
+                       src, count=1, flags=re.M)
+          p.write_text(src, encoding="utf-8")
+          print(f"version -> {new} (tag {tag})")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"new_version={new}\n")
+              f.write(f"tag={tag}\n")
+
+      - name: Commit kenaikan versi
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          git add pubspec.yaml
+          git commit -m "Rilis ${{ steps.bump.outputs.tag }} [skip ci]"
+          git push origin main
 
       - name: Generate Windows runner
         run: flutter create --platforms=windows .
@@ -132,8 +184,11 @@ jobs:
           retention-days: 90
 
       - name: Buat GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        # Hanya untuk run manual (pilih patch/minor/major).
+        # Push biasa ke main hanya menghasilkan artifact, tanpa Release.
+        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.bump.outputs.tag }}
           files: PT-BPR-Bank-Bulungan-windows.zip
           generate_release_notes: true

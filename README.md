@@ -6,17 +6,19 @@ Aplikasi desktop Windows untuk menjalankan undian berhadiah bank:
 
 ## Cara dapat file .exe (otomatis via GitHub Actions) ⭐
 
-Tidak perlu build manual di PC. Cukup push tag versi, GitHub akan build
-dan membuat Release otomatis berisi `PT-BPR-Bank-Bulungan-windows.zip`:
+Tidak perlu build manual di PC. Buka tab **Actions** di GitHub →
+**Build Windows Release** → **Run workflow** → pilih jenis kenaikan versi:
 
-```
-git tag v1.0.0
-git push origin v1.0.0
-```
+- **patch** — perbaikan kecil (1.0.0 → 1.0.1)
+- **minor** — fitur baru (1.0.0 → 1.1.0)
+- **major** — perubahan besar (1.0.0 → 2.0.0)
+
+Workflow akan: menaikkan versi di `pubspec.yaml` → commit otomatis →
+build → membuat **GitHub Release** berisi `PT-BPR-Bank-Bulungan-windows.zip`.
 
 Tunggu beberapa menit di tab **Actions**, lalu unduh zip-nya di tab
-**Releases**. Push biasa ke `main` juga otomatis di-build (hasilnya ada di
-tab Actions > Artifacts, tanpa Release).
+**Releases**. Push biasa ke `main` juga otomatis di-build kalau file kode
+berubah (hasilnya ada di tab Actions > Artifacts, tanpa Release).
 
 Isi zip: folder `Release/` — jalankan `BPR_Bank_Bulungan.exe` di dalamnya.
 Folder tersebut portable (bisa dicopy ke flashdisk / PC lain).
