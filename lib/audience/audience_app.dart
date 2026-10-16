@@ -24,7 +24,7 @@ class AudienceApp extends StatefulWidget {
 
 enum _Stage { idle, shuffle, winner }
 
-class _AudienceAppState extends State<AudienceApp> {
+class _AudienceAppState extends State<AudienceApp> with WindowListener {
   _Stage _stage = _Stage.idle;
   String _coupon = '';
   String _nama = '';
@@ -43,6 +43,7 @@ class _AudienceAppState extends State<AudienceApp> {
     super.initState();
     _goFullscreen();
     _channel.setMethodCallHandler(_onMethod);
+    windowManager.addListener(this);
   }
 
   Future<void> _goFullscreen() async {
@@ -50,10 +51,23 @@ class _AudienceAppState extends State<AudienceApp> {
       await windowManager.ensureInitialized();
       await windowManager.setTitle('PT. BPR Bank Bulungan - Layar Penonton');
       await windowManager.setFullScreen(true);
+      // Cegah window penonton tertutup tidak sengaja (mis. Alt+F4):
+      // percobaan tutup diubah jadi sembunyikan saja (lihat onWindowClose).
+      await windowManager.setPreventClose(true);
     } catch (_) {
       // Plugin belum teregistrasi di sub-window (lihat README).
       // Window tetap jalan sebagai window biasa.
     }
+  }
+
+  /// Alt+F4 / tombol tutup JANGAN menghancurkan window penonton —
+  /// sembunyikan saja supaya operator bisa membukanya kembali instan
+  /// (state tampilan tetap terjaga) via "Buka Layar Penonton".
+  @override
+  void onWindowClose() async {
+    try {
+      await windowManager.hide();
+    } catch (_) {}
   }
 
   Future<dynamic> _onMethod(MethodCall call) async {
@@ -111,6 +125,7 @@ class _AudienceAppState extends State<AudienceApp> {
 
   @override
   void dispose() {
+    windowManager.removeListener(this);
     _stopRoll();
     super.dispose();
   }

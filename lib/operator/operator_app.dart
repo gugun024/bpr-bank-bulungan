@@ -22,6 +22,7 @@ class _OperatorAppState extends State<OperatorApp> {
   int _tab = 0;
   WindowController? _audienceController;
   bool _audienceOpen = false;
+  bool _openingAudience = false; // cegah klik ganda -> window dobel
 
   @override
   void initState() {
@@ -47,6 +48,8 @@ class _OperatorAppState extends State<OperatorApp> {
   }
 
   Future<void> _openAudience() async {
+    if (_openingAudience) return; // cegah race: klik ganda
+    if (mounted) setState(() => _openingAudience = true);
     try {
       var controller = await _findAudience();
       controller ??= await WindowController.create(
@@ -64,6 +67,8 @@ class _OperatorAppState extends State<OperatorApp> {
           SnackBar(content: Text('Gagal membuka layar penonton: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _openingAudience = false);
     }
   }
 
@@ -126,10 +131,18 @@ class _OperatorAppState extends State<OperatorApp> {
                     ],
                   )
                 : TextButton.icon(
-                    onPressed: _openAudience,
-                    icon: const Icon(Icons.monitor, color: Colors.white),
-                    label: const Text('Buka Layar Penonton',
-                        style: TextStyle(color: Colors.white)),
+                    onPressed: _openingAudience ? null : _openAudience,
+                    icon: _openingAudience
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white70),
+                          )
+                        : const Icon(Icons.monitor, color: Colors.white),
+                    label: Text(
+                        _openingAudience ? 'Membuka...' : 'Buka Layar Penonton',
+                        style: const TextStyle(color: Colors.white)),
                   ),
             const SizedBox(width: 12),
           ],
