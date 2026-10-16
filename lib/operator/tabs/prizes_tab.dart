@@ -116,44 +116,46 @@ class _PrizesTabState extends State<PrizesTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TabHeader(
-          title: 'Daftar Hadiah',
-          subtitle:
-              'Kelola hadiah yang diundi. Urutan mengikuti waktu penambahan.',
-          actions: [
-            FilledButton.icon(
-              onPressed: () => _dialog(),
-              style: OpTheme.primaryButton.copyWith(
-                padding: WidgetStateProperty.all(
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14)),
-              ),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Tambah Hadiah'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 20),
-        _prizes.isEmpty
-            ? const SizedBox(
-                height: 320,
-                child: EmptyState(
-                  icon: Icons.card_giftcard_outlined,
-                  title: 'Belum ada hadiah',
-                  subtitle: 'Tambahkan hadiah dulu sebelum memulai undian.',
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TabHeader(
+            title: 'Daftar Hadiah',
+            subtitle:
+                'Kelola hadiah yang diundi. Urutan mengikuti waktu penambahan.',
+            actions: [
+              FilledButton.icon(
+                onPressed: () => _dialog(),
+                style: OpTheme.primaryButton.copyWith(
+                  padding: WidgetStateProperty.all(
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 14)),
                 ),
-              )
-            : Wrap(
-                spacing: 14,
-                runSpacing: 14,
-                children: [
-                  for (var i = 0; i < _prizes.length; i++)
-                    _prizeCard(_prizes[i], i),
-                ],
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Tambah Hadiah'),
               ),
-      ],
+            ],
+          ),
+          const SizedBox(height: 20),
+          _prizes.isEmpty
+              ? const SizedBox(
+                  height: 320,
+                  child: EmptyState(
+                    icon: Icons.card_giftcard_outlined,
+                    title: 'Belum ada hadiah',
+                    subtitle: 'Tambahkan hadiah dulu sebelum memulai undian.',
+                  ),
+                )
+              : Wrap(
+                  spacing: 14,
+                  runSpacing: 14,
+                  children: [
+                    for (var i = 0; i < _prizes.length; i++)
+                      _prizeCard(_prizes[i], i),
+                  ],
+                ),
+        ],
+      ),
     );
   }
 

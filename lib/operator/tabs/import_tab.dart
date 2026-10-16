@@ -131,13 +131,14 @@ class _ImportTabState extends State<ImportTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TabHeader(
-          title: 'Import Data',
-          subtitle:
-              'Data saat ini: $_existing rekening. Format: .xlsx, .xls, .csv. Kupon dihitung otomatis floor(saldo / 100.000).',
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TabHeader(
+            title: 'Import Data',
+            subtitle:
+                'Data saat ini: $_existing rekening. Format: .xlsx, .xls, .csv. Kupon dihitung otomatis floor(saldo / 100.000).',
           actions: [
             FilledButton.icon(
               onPressed: _busy ? null : _pick,
@@ -262,7 +263,8 @@ class _ImportTabState extends State<ImportTab> {
             ],
           ),
         ],
-      ],
+        ],
+      ),
     );
   }
 

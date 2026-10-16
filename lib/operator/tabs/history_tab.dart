@@ -160,29 +160,31 @@ class _HistoryTabState extends State<HistoryTab> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        headingRowColor:
-                            WidgetStateProperty.all(OpTheme.navySoft),
-                        headingTextStyle: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: OpTheme.navy,
-                            fontSize: 13),
-                        dataTextStyle: const TextStyle(
-                            fontSize: 13, color: Color(0xFF1E2A45)),
-                        columns: const [
-                          DataColumn(label: Text('No')),
-                          DataColumn(label: Text('Nama')),
-                          DataColumn(label: Text('No. Rekening')),
-                          DataColumn(label: Text('No. Kupon')),
-                          DataColumn(label: Text('Hadiah')),
-                          DataColumn(label: Text('Mode')),
-                          DataColumn(label: Text('Waktu')),
-                        ],
-                        rows: [
-                          for (var i = 0; i < _winners.length; i++)
-                            _row(i + 1, _winners[i]),
-                        ],
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          headingRowColor:
+                              WidgetStateProperty.all(OpTheme.navySoft),
+                          headingTextStyle: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: OpTheme.navy,
+                              fontSize: 13),
+                          dataTextStyle: const TextStyle(
+                              fontSize: 13, color: Color(0xFF1E2A45)),
+                          columns: const [
+                            DataColumn(label: Text('No')),
+                            DataColumn(label: Text('Nama')),
+                            DataColumn(label: Text('No. Rekening')),
+                            DataColumn(label: Text('No. Kupon')),
+                            DataColumn(label: Text('Hadiah')),
+                            DataColumn(label: Text('Mode')),
+                            DataColumn(label: Text('Waktu')),
+                          ],
+                          rows: [
+                            for (var i = 0; i < _winners.length; i++)
+                              _row(i + 1, _winners[i]),
+                          ],
+                        ),
                       ),
                     ),
                   ),
