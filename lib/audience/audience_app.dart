@@ -48,7 +48,7 @@ class _AudienceAppState extends State<AudienceApp> {
   Future<void> _goFullscreen() async {
     try {
       await windowManager.ensureInitialized();
-      await windowManager.setTitle('Undian Bank - Layar Penonton');
+      await windowManager.setTitle('BPR Bank Bulungan - Layar Penonton');
       await windowManager.setFullScreen(true);
     } catch (_) {
       // Plugin belum teregistrasi di sub-window (lihat README).

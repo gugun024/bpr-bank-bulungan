@@ -1,5 +1,5 @@
 name: undian_bank
-description: Aplikasi undian berhadiah bank (Windows) - window operator + window penonton.
+description: Aplikasi undian berhadiah BPR Bank Bulungan (Flutter Windows) - window operator + window penonton.
 publish_to: 'none'
 version: 1.0.0+1
 
