@@ -82,15 +82,17 @@ class _RandomTabState extends State<RandomTab> {
       await AudienceChannel.send(AudienceProtocol.startShuffle, {
         AudienceProtocol.argHadiah: _prize!.name,
       });
-      // Beri waktu animasi kocokan di layar penonton, lalu kunci hasil.
-      await Future.delayed(const Duration(seconds: 4));
+      // Hasil langsung dihitung & ditampilkan ke operator; layar penonton
+      // TERUS ng-roll tanpa henti sampai operator Konfirmasi / Batalkan.
+      // (Tidak ada stopShuffle di tengah — penonton tidak boleh melihat
+      // nomor beku yang bukan hasil asli.)
       final res = await _svc.drawRandom();
-      await AudienceChannel.send(AudienceProtocol.stopShuffle);
       if (!mounted) return;
       if (res == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Pool kosong — semua sudah menang.')),
         );
+        await AudienceChannel.send(AudienceProtocol.showIdle);
       } else {
         setState(() => _drawn = res);
       }

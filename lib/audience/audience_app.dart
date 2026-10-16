@@ -113,6 +113,9 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         final args = (call.arguments as Map?) ?? {};
         setState(() {
           _hadiah = (args[AudienceProtocol.argHadiah] ?? '').toString();
+          // Hadiah baru = undian sebelumnya selesai → kembali ke idle,
+          // kecuali sedang mengocok (mode random).
+          if (_stage != _Stage.shuffle) _stage = _Stage.idle;
         });
         break;
     }
