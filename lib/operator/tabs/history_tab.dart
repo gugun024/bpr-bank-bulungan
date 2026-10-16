@@ -9,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../core/database.dart';
 import '../../core/models.dart';
+import '../../shared/theme.dart';
+import '../widgets/ui_kit.dart';
 
 /// Tab riwayat pemenang + export + undo.
 class HistoryTab extends StatefulWidget {
@@ -107,54 +109,86 @@ class _HistoryTabState extends State<HistoryTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('Riwayat Pemenang',
-                  style: Theme.of(context).textTheme.headlineSmall),
-              const Spacer(),
-              OutlinedButton.icon(
-                onPressed: _winners.isEmpty ? null : _undo,
-                icon: const Icon(Icons.undo),
-                label: const Text('Batalkan Terakhir'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TabHeader(
+          title: 'Riwayat Pemenang',
+          subtitle:
+              '${_winners.length} pemenang tercatat. Satu rekening hanya bisa menang 1x.',
+          actions: [
+            OutlinedButton.icon(
+              onPressed: _winners.isEmpty ? null : _undo,
+              style: OutlinedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: (_winners.isEmpty || _busy) ? null : _export,
-                icon: const Icon(Icons.download),
-                label: const Text('Export CSV'),
+              icon: const Icon(Icons.undo, size: 18),
+              label: const Text('Batalkan Terakhir'),
+            ),
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: (_winners.isEmpty || _busy) ? null : _export,
+              style: OpTheme.primaryButton.copyWith(
+                padding: WidgetStateProperty.all(
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14)),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _winners.isEmpty
-                ? const Center(child: Text('Belum ada pemenang.'))
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('No')),
-                        DataColumn(label: Text('Nama')),
-                        DataColumn(label: Text('No. Rekening')),
-                        DataColumn(label: Text('No. Kupon')),
-                        DataColumn(label: Text('Hadiah')),
-                        DataColumn(label: Text('Mode')),
-                        DataColumn(label: Text('Waktu')),
-                      ],
-                      rows: [
-                        for (var i = 0; i < _winners.length; i++)
-                          _row(i + 1, _winners[i]),
-                      ],
+              icon: const Icon(Icons.download, size: 18),
+              label: const Text('Export CSV'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        if (_busy) const LinearProgressIndicator(),
+        Expanded(
+          child: _winners.isEmpty
+              ? const OpCard(
+                  child: SizedBox(
+                    height: 320,
+                    child: EmptyState(
+                      icon: Icons.emoji_events_outlined,
+                      title: 'Belum ada pemenang',
+                      subtitle:
+                          'Hasil undian akan tercatat di sini secara otomatis.',
                     ),
                   ),
-          ),
-        ],
-      ),
+                )
+              : Container(
+                  decoration: OpTheme.card(),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        headingRowColor:
+                            WidgetStateProperty.all(OpTheme.navySoft),
+                        headingTextStyle: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: OpTheme.navy,
+                            fontSize: 13),
+                        dataTextStyle: const TextStyle(
+                            fontSize: 13, color: Color(0xFF1E2A45)),
+                        columns: const [
+                          DataColumn(label: Text('No')),
+                          DataColumn(label: Text('Nama')),
+                          DataColumn(label: Text('No. Rekening')),
+                          DataColumn(label: Text('No. Kupon')),
+                          DataColumn(label: Text('Hadiah')),
+                          DataColumn(label: Text('Mode')),
+                          DataColumn(label: Text('Waktu')),
+                        ],
+                        rows: [
+                          for (var i = 0; i < _winners.length; i++)
+                            _row(i + 1, _winners[i]),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 
@@ -165,13 +199,27 @@ class _HistoryTabState extends State<HistoryTab> {
           .format(DateTime.parse(w.drawnAt));
     } catch (_) {}
     return DataRow(cells: [
-      DataCell(Text('$no')),
-      DataCell(Text(w.accountNama ?? '')),
+      DataCell(Text('$no', style: const TextStyle(color: OpTheme.textMuted))),
+      DataCell(Text(w.accountNama ?? '',
+          style: const TextStyle(fontWeight: FontWeight.w700))),
       DataCell(Text(w.accountRekening ?? '')),
-      DataCell(Text(Account.formatCoupon(w.couponNo))),
-      DataCell(Text(w.prizeName ?? '')),
-      DataCell(Text(w.mode)),
-      DataCell(Text(when)),
+      DataCell(Text(
+        Account.formatCoupon(w.couponNo),
+        style: const TextStyle(
+            fontFeatures: [FontFeature.tabularFigures()],
+            fontWeight: FontWeight.w700,
+            color: OpTheme.navy),
+      )),
+      DataCell(Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.card_giftcard, size: 14, color: OpTheme.goldDark),
+          const SizedBox(width: 6),
+          Text(w.prizeName ?? ''),
+        ],
+      )),
+      DataCell(ModeBadge(w.mode)),
+      DataCell(Text(when, style: const TextStyle(color: OpTheme.textMuted))),
     ]);
   }
 }

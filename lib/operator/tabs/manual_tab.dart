@@ -7,6 +7,7 @@ import '../../core/draw_service.dart';
 import '../../core/models.dart';
 import '../../shared/protocol.dart';
 import '../../shared/theme.dart';
+import '../widgets/ui_kit.dart';
 
 /// Tab undian manual: ketik nomor kupon → validasi → pilih hadiah → tampilkan.
 class ManualTab extends StatefulWidget {
@@ -141,169 +142,169 @@ class _ManualTabState extends State<ManualTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Undian Manual',
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          const Text(
-              'Ketik nomor kupon yang keluar dari alat roll, lalu pilih hadiah.'),
-          const SizedBox(height: 24),
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const TabHeader(
+          title: 'Undian Manual',
+          subtitle:
+              'Ketik nomor kupon yang keluar dari alat roll, verifikasi, lalu tampilkan ke layar penonton.',
+        ),
+        const SizedBox(height: 20),
+        OpCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              SizedBox(
-                width: 280,
+              Expanded(
                 child: TextField(
                   controller: _couponCtrl,
                   autofocus: true,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    labelText: 'Nomor kupon',
-                    hintText: 'cth: 000068',
-                    border: OutlineInputBorder(),
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 6,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                    color: OpTheme.navy,
                   ),
+                  decoration: OpTheme.input('Nomor kupon',
+                      hint: 'cth: 000068',
+                      prefix: const Icon(Icons.confirmation_number_outlined,
+                          color: OpTheme.navy)),
                   onSubmitted: (_) => _lookup(),
                 ),
               ),
               const SizedBox(width: 12),
               FilledButton.icon(
                 onPressed: _busy ? null : _lookup,
+                style: OpTheme.primaryButton,
                 icon: const Icon(Icons.search),
                 label: const Text('Cari'),
               ),
               const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: _reset,
+                style: OutlinedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
                 icon: const Icon(Icons.refresh),
-                label: const Text('Tolak & Undi Lagi'),
+                label: const Text('Reset'),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          if (_busy) const LinearProgressIndicator(),
-          if (_error != null)
-            _banner(_error!, Colors.red.shade700, Icons.error),
-          if (_rejectedInfo != null)
-            _banner(_rejectedInfo!, Colors.red.shade800, Icons.block,
-                big: true),
-          if (_found != null) _accountCard(_found!),
+        ),
+        const SizedBox(height: 16),
+        if (_busy) const LinearProgressIndicator(),
+        if (_error != null)
+          _banner(_error!, OpTheme.danger, Icons.error_outline),
+        if (_rejectedInfo != null)
+          _banner(_rejectedInfo!, OpTheme.danger, Icons.block, big: true),
+        if (_found != null) _accountCard(_found!),
+      ],
+    );
+  }
+
+  Widget _banner(String text, Color color, IconData icon, {bool big = false}) {
+    const soft = OpTheme.dangerSoft;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.all(big ? 20 : 14),
+      decoration: BoxDecoration(
+        color: soft,
+        border:
+            Border.all(color: color.withValues(alpha: 0.4), width: big ? 2 : 1),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: big ? 52 : 40,
+            height: big ? 52 : 40,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(big ? 26 : 20),
+            ),
+            child: Icon(icon, color: Colors.white, size: big ? 30 : 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(text,
+                style: TextStyle(
+                    color: OpTheme.danger,
+                    fontWeight: big ? FontWeight.w800 : FontWeight.w600,
+                    fontSize: big ? 17 : 14,
+                    height: 1.5)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _banner(String text, Color color, IconData icon, {bool big = false}) =>
-      Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: EdgeInsets.all(big ? 20 : 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          border: Border.all(color: color, width: big ? 2 : 1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color, size: big ? 40 : 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(text,
-                  style: TextStyle(
-                      color: color,
-                      fontWeight: big ? FontWeight.bold : FontWeight.normal,
-                      fontSize: big ? 18 : 14)),
-            ),
-          ],
-        ),
-      );
-
   Widget _accountCard(DrawResult res) {
     final a = res.account;
     final fmt = NumberFormat('#,###', 'id');
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.confirmation_number,
-                    color: AudienceTheme.navy800, size: 32),
-                const SizedBox(width: 12),
-                Text(
-                  'Kupon ${Account.formatCoupon(res.couponNo, _couponWidth)}',
-                  style: const TextStyle(
-                      fontSize: 24, fontWeight: FontWeight.bold),
+    return OpCardHeader(
+      icon: Icons.verified_outlined,
+      title: 'Kupon Terverifikasi',
+      trailing: Account.formatCoupon(res.couponNo, _couponWidth),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const StatusBadge('Valid & belum menang',
+                  fg: OpTheme.success, bg: OpTheme.successSoft),
+              const Spacer(),
+              Text('${a.kuponCount} kupon dimiliki',
+                  style:
+                      const TextStyle(color: OpTheme.textMuted, fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(a.nama.toUpperCase(),
+              style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: OpTheme.navy,
+                  letterSpacing: 1)),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          DetailRow('No. Rekening', a.rekening, highlight: true),
+          if (a.rekeningLama.isNotEmpty) DetailRow('Rek. Lama', a.rekeningLama),
+          if (a.alamat.isNotEmpty) DetailRow('Alamat', a.alamat),
+          DetailRow('Saldo', 'Rp ${fmt.format(a.saldo)}'),
+          DetailRow('Range kupon',
+              '${Account.formatCoupon(a.couponStart, _couponWidth)} – ${Account.formatCoupon(a.couponEnd, _couponWidth)}'),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<Prize>(
+                  initialValue: _prize,
+                  decoration: OpTheme.input('Hadiah untuk kupon ini'),
+                  items: [
+                    for (final p in _prizes)
+                      DropdownMenuItem(value: p, child: Text(p.name)),
+                  ],
+                  onChanged: (v) => setState(() => _prize = v),
                 ),
-                const Spacer(),
-                const Icon(Icons.verified, color: Colors.green),
-                const SizedBox(width: 4),
-                const Text('Valid & belum menang',
-                    style: TextStyle(color: Colors.green)),
-              ],
-            ),
-            const Divider(height: 32),
-            _kv('Nama', a.nama),
-            _kv('No. Rekening', a.rekening),
-            if (a.rekeningLama.isNotEmpty) _kv('Rek. Lama', a.rekeningLama),
-            if (a.alamat.isNotEmpty) _kv('Alamat', a.alamat),
-            _kv('Saldo', 'Rp ${fmt.format(a.saldo)}'),
-            _kv('Jumlah kupon', '${a.kuponCount}'),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<Prize>(
-                    initialValue: _prize,
-                    decoration: const InputDecoration(
-                      labelText: 'Hadiah',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: [
-                      for (final p in _prizes)
-                        DropdownMenuItem(value: p, child: Text(p.name)),
-                    ],
-                    onChanged: (v) => setState(() => _prize = v),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                FilledButton.icon(
-                  onPressed: (_busy || _prize == null) ? null : () => _submit(),
-                  icon: const Icon(Icons.present_to_all),
-                  label: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text('Tampilkan ke Layar',
-                        style: TextStyle(fontSize: 16)),
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AudienceTheme.navy800,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: (_busy || _prize == null) ? null : () => _submit(),
+                style: OpTheme.goldButton,
+                icon: const Icon(Icons.present_to_all),
+                label: const Text('Tampilkan ke Layar'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
-
-  Widget _kv(String k, String v) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-                width: 140,
-                child: Text(k, style: const TextStyle(color: Colors.black54))),
-            Expanded(
-                child: Text(v,
-                    style: const TextStyle(fontWeight: FontWeight.w600))),
-          ],
-        ),
-      );
 }

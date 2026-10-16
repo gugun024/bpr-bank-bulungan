@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/database.dart';
 import '../../core/models.dart';
+import '../../shared/theme.dart';
+import '../widgets/ui_kit.dart';
 
 /// Tab kelola daftar hadiah.
 class PrizesTab extends StatefulWidget {
@@ -114,61 +116,142 @@ class _PrizesTabState extends State<PrizesTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text('Daftar Hadiah',
-                  style: Theme.of(context).textTheme.headlineSmall),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: () => _dialog(),
-                icon: const Icon(Icons.add),
-                label: const Text('Tambah Hadiah'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TabHeader(
+          title: 'Daftar Hadiah',
+          subtitle:
+              'Kelola hadiah yang diundi. Urutan mengikuti waktu penambahan.',
+          actions: [
+            FilledButton.icon(
+              onPressed: () => _dialog(),
+              style: OpTheme.primaryButton.copyWith(
+                padding: WidgetStateProperty.all(
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14)),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _prizes.isEmpty
-                ? const Center(child: Text('Belum ada hadiah. Tambahkan dulu.'))
-                : ListView.separated(
-                    itemCount: _prizes.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (ctx, i) {
-                      final p = _prizes[i];
-                      final won = _wonCount[p.id] ?? 0;
-                      final left = p.qty - won;
-                      return ListTile(
-                        leading: CircleAvatar(child: Text('${i + 1}')),
-                        title: Text(p.name,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: Text(
-                            'Terundi: $won / ${p.qty}${left <= 0 ? ' — HABIS' : ''}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              tooltip: 'Ubah',
-                              icon: const Icon(Icons.edit),
-                              onPressed: () => _dialog(existing: p),
-                            ),
-                            IconButton(
-                              tooltip: 'Hapus',
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _delete(p),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Tambah Hadiah'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _prizes.isEmpty
+            ? const SizedBox(
+                height: 320,
+                child: EmptyState(
+                  icon: Icons.card_giftcard_outlined,
+                  title: 'Belum ada hadiah',
+                  subtitle: 'Tambahkan hadiah dulu sebelum memulai undian.',
+                ),
+              )
+            : Wrap(
+                spacing: 14,
+                runSpacing: 14,
+                children: [
+                  for (var i = 0; i < _prizes.length; i++)
+                    _prizeCard(_prizes[i], i),
+                ],
+              ),
+      ],
+    );
+  }
+
+  Widget _prizeCard(Prize p, int index) {
+    final won = _wonCount[p.id] ?? 0;
+    final left = p.qty - won;
+    final done = left <= 0;
+    final progress = p.qty > 0 ? (won / p.qty).clamp(0.0, 1.0) : 0.0;
+    return SizedBox(
+      width: 340,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: OpTheme.card(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: done
+                          ? [Colors.grey.shade400, Colors.grey.shade500]
+                          : [OpTheme.gold, const Color(0xFFF3D27A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-          ),
-        ],
+                  child: Icon(Icons.card_giftcard,
+                      color: done ? Colors.white : OpTheme.navyDark, size: 26),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(p.name,
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: OpTheme.navy)),
+                      Text('Hadiah #${index + 1}',
+                          style: const TextStyle(
+                              fontSize: 12, color: OpTheme.textMuted)),
+                    ],
+                  ),
+                ),
+                if (done)
+                  const StatusBadge('HABIS',
+                      fg: OpTheme.danger, bg: OpTheme.dangerSoft)
+                else
+                  StatusBadge('Sisa $left',
+                      fg: OpTheme.success, bg: OpTheme.successSoft),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 8,
+                      backgroundColor: OpTheme.navySoft,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          done ? Colors.grey : OpTheme.gold),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text('$won / ${p.qty} terundi',
+                    style: const TextStyle(
+                        fontSize: 12, color: OpTheme.textMuted)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: () => _dialog(existing: p),
+                  icon: const Icon(Icons.edit, size: 16),
+                  label: const Text('Ubah'),
+                ),
+                TextButton.icon(
+                  onPressed: () => _delete(p),
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  label: const Text('Hapus'),
+                  style: TextButton.styleFrom(foregroundColor: OpTheme.danger),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

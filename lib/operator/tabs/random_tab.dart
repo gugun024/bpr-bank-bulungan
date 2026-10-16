@@ -5,6 +5,7 @@ import '../../core/draw_service.dart';
 import '../../core/models.dart';
 import '../../shared/protocol.dart';
 import '../../shared/theme.dart';
+import '../widgets/ui_kit.dart';
 
 /// Tab undian random (berbobot): kocok → konfirmasi → tampilkan.
 class RandomTab extends StatefulWidget {
@@ -21,6 +22,7 @@ class _RandomTabState extends State<RandomTab> {
   DrawResult? _drawn;
   bool _busy = false;
   int _pool = 0;
+  int _winners = 0;
   int _couponWidth = 6;
 
   @override
@@ -33,10 +35,12 @@ class _RandomTabState extends State<RandomTab> {
     final db = DatabaseHelper.instance;
     final prizes = await db.getPrizes();
     final pool = await db.totalCoupons();
+    final winners = (await db.getWinners()).length;
     if (!mounted) return;
     setState(() {
       _prizes = prizes;
       _pool = pool;
+      _winners = winners;
       _couponWidth = pool.toString().length.clamp(6, 12);
       if (_prize == null || !prizes.any((p) => p.id == _prize!.id)) {
         _prize = prizes.isNotEmpty ? prizes.first : null;
@@ -109,27 +113,45 @@ class _RandomTabState extends State<RandomTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Undian Random',
-              style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 8),
-          Text(
-              'Pool saat ini: $_pool kupon eligible (sudah menang otomatis dikecualikan). '
-              'Makin banyak kupon, makin besar peluang.'),
-          const SizedBox(height: 24),
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const TabHeader(
+          title: 'Undian Random',
+          subtitle:
+              'Kocok otomatis berbobot: makin banyak kupon, makin besar peluang. Pemenang lama otomatis dikecualikan.',
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            StatTile(
+                icon: Icons.confirmation_number_outlined,
+                value: '$_pool',
+                label: 'Total kupon',
+                accent: OpTheme.navy),
+            const SizedBox(width: 12),
+            StatTile(
+                icon: Icons.emoji_events_outlined,
+                value: '$_winners',
+                label: 'Sudah menang',
+                accent: OpTheme.goldDark),
+            const SizedBox(width: 12),
+            StatTile(
+                icon: Icons.card_giftcard_outlined,
+                value: '${_prizes.length}',
+                label: 'Hadiah terdaftar',
+                accent: OpTheme.success),
+          ],
+        ),
+        const SizedBox(height: 16),
+        OpCard(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
                 child: DropdownButtonFormField<Prize>(
                   initialValue: _prize,
-                  decoration: const InputDecoration(
-                    labelText: 'Hadiah yang diundi',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: OpTheme.input('Hadiah yang diundi sekarang'),
                   items: [
                     for (final p in _prizes)
                       DropdownMenuItem(value: p, child: Text(p.name)),
@@ -141,82 +163,74 @@ class _RandomTabState extends State<RandomTab> {
               FilledButton.icon(
                 onPressed:
                     (_busy || _prize == null || _pool == 0) ? null : _shuffle,
+                style: OpTheme.primaryButton,
                 icon: const Icon(Icons.casino),
-                label: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text('Kocok', style: TextStyle(fontSize: 16)),
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AudienceTheme.navy800,
-                ),
+                label: const Text('Kocok'),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          if (_busy) const LinearProgressIndicator(),
-          if (_drawn != null) _resultCard(_drawn!),
-        ],
-      ),
+        ),
+        const SizedBox(height: 16),
+        if (_busy) const LinearProgressIndicator(),
+        if (_drawn != null) _resultCard(_drawn!),
+      ],
     );
   }
 
   Widget _resultCard(DrawResult res) {
     final a = res.account;
-    return Card(
-      elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.emoji_events, color: Colors.amber, size: 32),
-                SizedBox(width: 12),
-                Text('Hasil kocokan',
-                    style:
-                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Kupon ${Account.formatCoupon(res.couponNo, _couponWidth)}',
+    return OpCardHeader(
+      icon: Icons.emoji_events,
+      title: 'Hasil Kocokan',
+      trailing: Account.formatCoupon(res.couponNo, _couponWidth),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(a.nama.toUpperCase(),
               style: const TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 4,
-                  fontFeatures: [FontFeature.tabularFigures()]),
-            ),
-            const SizedBox(height: 8),
-            Text('Nama: ${a.nama}', style: const TextStyle(fontSize: 18)),
-            Text('No. Rekening: ${a.rekening}',
-                style: const TextStyle(fontSize: 18)),
-            Text('Hadiah: ${_prize?.name ?? '-'}',
-                style: const TextStyle(fontSize: 18)),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                FilledButton.icon(
-                  onPressed: _busy ? null : _confirm,
-                  icon: const Icon(Icons.present_to_all),
-                  label: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text('Konfirmasi & Tampilkan',
-                        style: TextStyle(fontSize: 16)),
-                  ),
-                  style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green.shade700),
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: OpTheme.navy,
+                  letterSpacing: 1)),
+          const SizedBox(height: 12),
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+          DetailRow('No. Rekening', a.rekening, highlight: true),
+          DetailRow('Hadiah', _prize?.name ?? '-'),
+          DetailRow('Peluang', '${a.kuponCount} dari $_pool kupon'),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              FilledButton.icon(
+                onPressed: _busy ? null : _confirm,
+                style: FilledButton.styleFrom(
+                  backgroundColor: OpTheme.success,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  textStyle: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _cancel,
-                  icon: const Icon(Icons.close),
-                  label: const Text('Batalkan'),
+                icon: const Icon(Icons.present_to_all),
+                label: const Text('Konfirmasi & Tampilkan'),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _cancel,
+                style: OutlinedButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
-              ],
-            ),
-          ],
-        ),
+                icon: const Icon(Icons.close),
+                label: const Text('Batalkan'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

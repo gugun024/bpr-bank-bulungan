@@ -100,72 +100,188 @@ class _OperatorAppState extends State<OperatorApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: AudienceTheme.navy800),
+        colorScheme: ColorScheme.fromSeed(seedColor: OpTheme.navy),
         useMaterial3: true,
+        scaffoldBackgroundColor: OpTheme.bg,
       ),
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('PT. BPR Bank Bulungan — Operator'),
-          backgroundColor: AudienceTheme.navy800,
-          foregroundColor: Colors.white,
+          title: const Row(
+            children: [
+              _BankMark(),
+              SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('PT. BPR Bank Bulungan',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                  Text('Aplikasi Undian Berhadiah — Operator',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                          color: OpTheme.textMuted)),
+                ],
+              ),
+            ],
+          ),
+          backgroundColor: Colors.white,
+          foregroundColor: OpTheme.navy,
+          elevation: 0,
+          shape: const Border(bottom: BorderSide(color: OpTheme.cardBorder)),
           actions: [
             _audienceOpen
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.monitor, color: Colors.lightGreenAccent),
-                      const SizedBox(width: 8),
-                      const Text('Layar penonton aktif',
-                          style: TextStyle(color: Colors.white70)),
-                      IconButton(
-                        tooltip: 'Reset ke splash',
-                        icon: const Icon(Icons.refresh),
-                        onPressed: () =>
-                            AudienceChannel.send(AudienceProtocol.showIdle),
-                      ),
-                      IconButton(
-                        tooltip: 'Sembunyikan layar penonton',
-                        icon: const Icon(Icons.close),
-                        onPressed: _hideAudience,
-                      ),
-                    ],
+                ? Container(
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: OpTheme.successSoft,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                          color: OpTheme.success.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: OpTheme.success,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('Layar Penonton Aktif',
+                            style: TextStyle(
+                                color: OpTheme.success,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13)),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: 'Reset ke splash',
+                          icon: const Icon(Icons.refresh, size: 18),
+                          color: OpTheme.success,
+                          onPressed: () =>
+                              AudienceChannel.send(AudienceProtocol.showIdle),
+                        ),
+                        IconButton(
+                          tooltip: 'Sembunyikan layar penonton',
+                          icon: const Icon(Icons.close, size: 18),
+                          color: OpTheme.success,
+                          onPressed: _hideAudience,
+                        ),
+                      ],
+                    ),
                   )
-                : TextButton.icon(
-                    onPressed: _openingAudience ? null : _openAudience,
-                    icon: _openingAudience
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white70),
-                          )
-                        : const Icon(Icons.monitor, color: Colors.white),
-                    label: Text(
-                        _openingAudience ? 'Membuka...' : 'Buka Layar Penonton',
-                        style: const TextStyle(color: Colors.white)),
+                : Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: FilledButton.icon(
+                      onPressed: _openingAudience ? null : _openAudience,
+                      style: OpTheme.primaryButton.copyWith(
+                        padding: WidgetStateProperty.all(
+                            const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 0)),
+                      ),
+                      icon: _openingAudience
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white70),
+                            )
+                          : const Icon(Icons.monitor, size: 18),
+                      label: Text(_openingAudience
+                          ? 'Membuka...'
+                          : 'Buka Layar Penonton'),
+                    ),
                   ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
           ],
         ),
         body: Row(
           children: [
             NavigationRail(
+              backgroundColor: OpTheme.navyDark,
               selectedIndex: _tab,
               onDestinationSelected: (i) => setState(() => _tab = i),
               labelType: NavigationRailLabelType.all,
+              groupAlignment: -1.0,
+              leading: const Padding(
+                padding: EdgeInsets.only(top: 20, bottom: 12),
+                child: _BankMark(size: 46),
+              ),
+              unselectedIconTheme:
+                  const IconThemeData(color: Colors.white38, size: 24),
+              selectedIconTheme:
+                  const IconThemeData(color: OpTheme.gold, size: 24),
+              unselectedLabelTextStyle:
+                  const TextStyle(color: Colors.white38, fontSize: 11),
+              selectedLabelTextStyle: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700),
+              indicatorColor: OpTheme.gold.withValues(alpha: 0.16),
+              indicatorShape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
               destinations: [
                 for (final t in tabs)
                   NavigationRailDestination(
-                    icon: Icon(t.icon),
+                    icon: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Icon(t.icon)),
                     label: Text(t.label),
                   ),
               ],
             ),
-            const VerticalDivider(width: 1),
-            Expanded(child: tabs[_tab].body),
+            Expanded(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: Padding(
+                    padding: const EdgeInsets.all(28),
+                    child: tabs[_tab].body,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Logo mini "BPR" gold di sidebar & appbar.
+class _BankMark extends StatelessWidget {
+  final double size;
+  const _BankMark({this.size = 34});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [OpTheme.gold, Color(0xFFF3D27A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(size * 0.28),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x33000000), blurRadius: 8, offset: Offset(0, 3)),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Text('BPR',
+          style: TextStyle(
+              color: OpTheme.navyDark,
+              fontWeight: FontWeight.w900,
+              fontSize: size * 0.26,
+              letterSpacing: 0.5)),
     );
   }
 }
