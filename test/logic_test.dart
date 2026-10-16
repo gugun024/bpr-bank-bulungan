@@ -38,6 +38,71 @@ void main() {
     expect(DrawService.normalizeCouponInput('0'), isNull);
   });
 
+  test('validasi import: duplikat rekening & kupon tidak cocok', () {
+    // Header: rekening | rekening lama | nama | alamat | saldo | kupon
+    final preview = ImportPreview(
+      ['rekening', 'rekening lama', 'nama', 'alamat', 'saldo', 'kupon'],
+      [
+        // baris 2: valid, kupon cocok (6.889.777 -> 68)
+        [
+          '01.13.097863.001',
+          '01.13.097863.01',
+          'fazli',
+          'jl. Kamboja',
+          '6.889.777',
+          '68'
+        ],
+        // baris 3: duplikat rekening (beda format titik) -> ERROR
+        ['0113097863001', '', 'fazli 2', '', '200.000', '2'],
+        // baris 4: kupon file (5) != hitungan (190.000 -> 1) -> WARNING
+        ['02.22.000001.001', '', 'budi', '', '190.000', '5'],
+        // baris 5: saldo < 100rb -> 0 kupon, info saja
+        ['03.33.000002.001', '', 'siti', '', '50.000', '0'],
+        // baris 6: tanpa rekening -> dilewati
+        ['', '', 'tanpa rekening', '', '1.000.000', '10'],
+      ],
+    );
+    final m = ImportService.autoMap(preview.headers);
+    expect(m.valid, isTrue);
+    expect(m.kupon, 5);
+
+    final v = ImportService.validateImport(preview, m);
+
+    // Duplikat: 1 temuan, menunjuk baris 3 & baris pertama (2).
+    expect(v.duplicates.length, 1);
+    expect(v.duplicates.first.row, 3);
+    expect(v.duplicates.first.message, contains('baris 2'));
+    expect(v.hasErrors, isTrue);
+
+    // Kupon mismatch: 1 temuan di baris 4.
+    expect(v.mismatches.length, 1);
+    expect(v.mismatches.first.row, 4);
+    expect(v.mismatches.first.message, contains('file=5'));
+    expect(v.mismatches.first.message, contains('hitungan=1'));
+
+    // Ringkasan.
+    expect(v.validAccounts, 4);
+    expect(v.skippedEmpty, 1);
+    expect(v.zeroCoupon, 1);
+    expect(v.totalCoupons, 68 + 2 + 1); // duplikat ikut dihitung di preview
+    expect(v.isClean, isFalse);
+  });
+
+  test('validasi import: file bersih lolos tanpa temuan', () {
+    final preview = ImportPreview(
+      ['rekening', 'nama', 'saldo'],
+      [
+        ['01.13.097863.001', 'fazli', '6.889.777'],
+        ['02.22.000001.001', 'budi', '190.000'],
+      ],
+    );
+    final m = ImportService.autoMap(preview.headers);
+    final v = ImportService.validateImport(preview, m);
+    expect(v.isClean, isTrue);
+    expect(v.validAccounts, 2);
+    expect(v.totalCoupons, 69);
+  });
+
   test('alur undian: import -> lookup -> menang -> eksklusi -> random',
       () async {
     final db = DatabaseHelper.instance;

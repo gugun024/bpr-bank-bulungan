@@ -137,11 +137,147 @@ class ImportService {
     return accounts;
   }
 
+  /// Validasi data import sebelum disimpan ke DB.
+  ///
+  /// - ERROR (blokir import): no. rekening duplikat. Rekening adalah kunci
+  ///   eksklusi pemenang ("1 rekening menang 1x"), jadi duplikat = data salah.
+  ///   Perbandingan mengabaikan format: titik, spasi, dan huruf besar/kecil
+  ///   ("01.13.097863.001" == "0113097863001").
+  /// - WARNING (boleh lanjut): kolom kupon pada file tidak sama dengan
+  ///   floor(saldo / 100.000). Nilai hitungan ulang yang dipakai saat import.
+  static ImportValidation validateImport(
+      ImportPreview preview, ColumnMapping m) {
+    final duplicates = <ValidationIssue>[];
+    final mismatches = <ValidationIssue>[];
+    var skippedEmpty = 0;
+    var zeroCoupon = 0;
+    var validAccounts = 0;
+    var totalCoupons = 0;
+
+    final seen = <String, int>{}; // kunci rekening → nomor baris pertama
+
+    for (var i = 0; i < preview.rows.length; i++) {
+      final rowNum = i + 2; // baris 1 = header
+      final row = preview.rows[i];
+      String cell(int c) => (c >= 0 && c < row.length) ? row[c].trim() : '';
+      final rekening = cell(m.rekening);
+      final nama = cell(m.nama);
+      if (rekening.isEmpty) {
+        skippedEmpty++;
+        continue;
+      }
+      validAccounts++;
+
+      final stripped =
+          rekening.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      final key = stripped.isEmpty ? rekening.toLowerCase() : stripped;
+      final firstRow = seen[key];
+      if (firstRow != null) {
+        duplicates.add(ValidationIssue(
+          row: rowNum,
+          rekening: rekening,
+          nama: nama,
+          kind: 'duplikat',
+          message: 'Baris $rowNum: "$rekening" duplikat (sudah ada di baris '
+              '$firstRow).',
+        ));
+      } else {
+        seen[key] = rowNum;
+      }
+
+      final saldo = parseSaldo(cell(m.saldo));
+      final count = kuponCount(saldo);
+      if (count == 0) {
+        zeroCoupon++;
+      } else {
+        totalCoupons += count;
+      }
+
+      if (m.kupon >= 0) {
+        final raw = cell(m.kupon).replaceAll(RegExp(r'[^0-9]'), '');
+        final fileKupon = raw.isEmpty ? null : int.tryParse(raw);
+        if (fileKupon != null && fileKupon != count) {
+          mismatches.add(ValidationIssue(
+            row: rowNum,
+            rekening: rekening,
+            nama: nama,
+            kind: 'kupon',
+            message: 'Baris $rowNum: kupon file=$fileKupon ≠ hitungan=$count '
+                '(saldo $saldo). Dipakai: $count.',
+          ));
+        }
+      }
+    }
+
+    return ImportValidation(
+      duplicates: duplicates,
+      mismatches: mismatches,
+      skippedEmpty: skippedEmpty,
+      zeroCoupon: zeroCoupon,
+      validAccounts: validAccounts,
+      totalCoupons: totalCoupons,
+    );
+  }
+
   /// Lebar digit untuk format nomor kupon (min 6 digit).
   static int couponWidth(int totalCoupons) {
     final w = totalCoupons.toString().length;
     return w < 6 ? 6 : w;
   }
+}
+
+/// Satu temuan validasi pada sebuah baris data import.
+class ValidationIssue {
+  final int row; // nomor baris pada file (1-based, baris 1 = header)
+  final String rekening;
+  final String nama;
+  final String kind; // 'duplikat' | 'kupon'
+  final String message;
+
+  const ValidationIssue({
+    required this.row,
+    required this.rekening,
+    required this.nama,
+    required this.kind,
+    required this.message,
+  });
+}
+
+/// Hasil validasi data import sebelum disimpan ke DB.
+class ImportValidation {
+  /// ERROR: no. rekening duplikat → import diblokir.
+  final List<ValidationIssue> duplicates;
+
+  /// WARNING: kupon di file ≠ floor(saldo/100.000) → boleh lanjut,
+  /// nilai hitungan ulang yang dipakai.
+  final List<ValidationIssue> mismatches;
+
+  final int skippedEmpty; // baris tanpa no. rekening (dilewati)
+  final int zeroCoupon; // rekening valid tapi saldo < 100rb → 0 kupon
+  final int validAccounts;
+  final int totalCoupons;
+
+  const ImportValidation({
+    required this.duplicates,
+    required this.mismatches,
+    required this.skippedEmpty,
+    required this.zeroCoupon,
+    required this.validAccounts,
+    required this.totalCoupons,
+  });
+
+  bool get hasErrors => duplicates.isNotEmpty;
+  bool get hasWarnings => mismatches.isNotEmpty;
+  bool get isClean => !hasErrors && !hasWarnings;
+
+  static const empty = ImportValidation(
+    duplicates: [],
+    mismatches: [],
+    skippedEmpty: 0,
+    zeroCoupon: 0,
+    validAccounts: 0,
+    totalCoupons: 0,
+  );
 }
 
 /// Helper baca bytes file (dipakai untuk sniffing sederhana).
