@@ -46,6 +46,14 @@ jobs:
       - name: Generate Windows runner
         run: flutter create --platforms=windows .
 
+      - name: Hapus widget_test.dart bawaan (tidak dipakai)
+        # flutter create selalu generate test/widget_test.dart contoh
+        # (aplikasi counter) yang error di project ini.
+        shell: pwsh
+        run: |
+          Remove-Item -Path "test/widget_test.dart" -ErrorAction SilentlyContinue
+          Get-ChildItem test/
+
       - name: Patch flutter_window.cpp (registrasi plugin sub-window)
         # Wajib: tanpa ini window penonton (sub-window) tidak bisa fullscreen
         # karena plugin window_manager tidak terdaftar di engine keduanya.

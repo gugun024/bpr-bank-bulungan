@@ -18,6 +18,7 @@ dependencies:
   csv: ^6.0.0
   file_picker: ^8.1.7
   intl: ^0.20.2
+  path: ^1.9.1 # dipakai langsung oleh lib/core/database.dart & history_tab.dart
 
 dev_dependencies:
   flutter_test:

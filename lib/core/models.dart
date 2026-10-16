@@ -1,4 +1,4 @@
-/// Model data aplikasi undian bank.
+// Model data aplikasi undian bank.
 
 class Account {
   final int? id;
