@@ -187,77 +187,106 @@ class _ManualTabState extends State<ManualTab> {
               'Pilih hadiah dulu, lalu ketik nomor kupon dari alat roll dan tampilkan ke layar penonton.',
         ),
         const SizedBox(height: 20),
-        OpCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Hadiah yang diundi',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: OpTheme.navy)),
-              const SizedBox(height: 8),
-              PrizePicker(
-                prizes: _prizes,
-                remainingOf: _left,
-                selected: _prize,
-                onChanged: _onPrizeChanged,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // KIRI: pilih hadiah
+            Expanded(
+              flex: 5,
+              child: OpCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('Hadiah yang diundi',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: OpTheme.navy)),
+                    const SizedBox(height: 8),
+                    PrizePicker(
+                      prizes: _prizes,
+                      remainingOf: _left,
+                      selected: _prize,
+                      onChanged: _onPrizeChanged,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 14),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+            ),
+            const SizedBox(width: 16),
+            // KANAN: ketik kupon + hasil
+            Expanded(
+              flex: 6,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _couponCtrl,
-                      autofocus: true,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 6,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                        color: OpTheme.navy,
-                      ),
-                      decoration: OpTheme.input('Nomor kupon',
-                          hint: 'cth: 000068',
-                          prefix: const Icon(Icons.confirmation_number_outlined,
-                              color: OpTheme.navy)),
-                      onSubmitted: (_) => _lookup(),
+                  OpCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _couponCtrl,
+                          autofocus: true,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 6,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                            color: OpTheme.navy,
+                          ),
+                          decoration: OpTheme.input('Nomor kupon',
+                              hint: 'cth: 000068',
+                              prefix: const Icon(
+                                  Icons.confirmation_number_outlined,
+                                  color: OpTheme.navy)),
+                          onSubmitted: (_) => _lookup(),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed:
+                                    (_busy || _prize == null) ? null : _lookup,
+                                style: OpTheme.primaryButton,
+                                icon: const Icon(Icons.search),
+                                label: const Text('Cari'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              onPressed: _reset,
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20, vertical: 18),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Reset'),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  FilledButton.icon(
-                    onPressed: (_busy || _prize == null) ? null : _lookup,
-                    style: OpTheme.primaryButton,
-                    icon: const Icon(Icons.search),
-                    label: const Text('Cari'),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: _reset,
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 18),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Reset'),
-                  ),
+                  const SizedBox(height: 16),
+                  if (_busy) const LinearProgressIndicator(),
+                  if (_error != null)
+                    _banner(_error!, OpTheme.danger, Icons.error_outline),
+                  if (_rejectedInfo != null)
+                    _banner(_rejectedInfo!, OpTheme.danger, Icons.block,
+                        big: true),
+                  if (_found != null) _accountCard(_found!),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        if (_busy) const LinearProgressIndicator(),
-        if (_error != null)
-          _banner(_error!, OpTheme.danger, Icons.error_outline),
-        if (_rejectedInfo != null)
-          _banner(_rejectedInfo!, OpTheme.danger, Icons.block, big: true),
-        if (_found != null) _accountCard(_found!),
       ],
     ));
   }

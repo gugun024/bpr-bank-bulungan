@@ -176,40 +176,61 @@ class _RandomTabState extends State<RandomTab> {
           ],
         ),
         const SizedBox(height: 16),
-        OpCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('Hadiah yang diundi',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: OpTheme.navy)),
-              const SizedBox(height: 8),
-              PrizePicker(
-                prizes: _prizes,
-                remainingOf: _left,
-                selected: _prize,
-                onChanged: _onPrizeChanged,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed:
-                    (_busy || _prize == null || _pool == 0) ? null : _shuffle,
-                style: OpTheme.primaryButton.copyWith(
-                  minimumSize:
-                      WidgetStateProperty.all(const Size(double.infinity, 56)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // KIRI: pilih hadiah
+            Expanded(
+              flex: 5,
+              child: OpCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('Hadiah yang diundi',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: OpTheme.navy)),
+                    const SizedBox(height: 8),
+                    PrizePicker(
+                      prizes: _prizes,
+                      remainingOf: _left,
+                      selected: _prize,
+                      onChanged: _onPrizeChanged,
+                    ),
+                  ],
                 ),
-                icon: const Icon(Icons.casino),
-                label:
-                    Text(_prize == null ? 'Kocok' : 'Kocok — ${_prize!.name}'),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 16),
+            // KANAN: kocok + hasil
+            Expanded(
+              flex: 6,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OpCard(
+                    child: FilledButton.icon(
+                      onPressed: (_busy || _prize == null || _pool == 0)
+                          ? null
+                          : _shuffle,
+                      style: OpTheme.primaryButton.copyWith(
+                        minimumSize: WidgetStateProperty.all(
+                            const Size(double.infinity, 56)),
+                      ),
+                      icon: const Icon(Icons.casino),
+                      label: Text(
+                          _prize == null ? 'Kocok' : 'Kocok — ${_prize!.name}'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (_busy) const LinearProgressIndicator(),
+                  if (_drawn != null) _resultCard(_drawn!),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        if (_busy) const LinearProgressIndicator(),
-        if (_drawn != null) _resultCard(_drawn!),
       ],
     ));
   }
