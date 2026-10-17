@@ -20,9 +20,14 @@ class AudienceProtocol {
   /// Tidak ada args.
   static const String audienceHidden = 'audienceHidden';
 
+  /// operator → penonton: bisukan / nyalakan efek suara.
+  /// args: {muted: bool}
+  static const String audienceMute = 'audienceMute';
+
   static const String argCoupon = 'coupon';
   static const String argNama = 'nama';
   static const String argHadiah = 'hadiah';
+  static const String argMuted = 'muted';
 }
 
 /// Pengirim perintah ke window penonton (dipakai window operator).

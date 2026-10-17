@@ -20,6 +20,7 @@ dependencies:
   file_picker: ^8.1.7
   intl: ^0.20.2
   path: ^1.9.1 # dipakai langsung oleh lib/core/database.dart & history_tab.dart
+  audioplayers: ^6.7.1
 
 dev_dependencies:
   flutter_test:
@@ -28,3 +29,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/sounds/tick.wav
+    - assets/sounds/fanfare.wav

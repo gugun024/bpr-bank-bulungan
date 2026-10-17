@@ -8,6 +8,7 @@ import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../shared/protocol.dart';
+import '../shared/sounds.dart';
 import '../shared/theme.dart';
 
 /// Window penonton: fullscreen di monitor kedua / proyektor.
@@ -132,6 +133,11 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           if (_stage != _Stage.shuffle) _stage = _Stage.idle;
         });
         break;
+      case AudienceProtocol.audienceMute:
+        final args = (call.arguments as Map?) ?? {};
+        final m = args[AudienceProtocol.argMuted];
+        Sounds.setMuted(m is bool ? m : m.toString() == 'true');
+        break;
     }
     return null;
   }
@@ -143,6 +149,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         setState(() {
           _rolling = _rand.nextInt(1000000).toString().padLeft(6, '0');
         });
+        Sounds.tick(); // bunyi kocokan tiap frame
       }
     });
   }
@@ -569,7 +576,18 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
     _roll.addStatusListener((s) {
       if (s == AnimationStatus.completed && mounted) {
         setState(() => _locked = true);
+        Sounds.fanfare(); // nomor dikunci → fanfare!
         _reveal.forward();
+      }
+    });
+    // Tick tiap frame roll — karena kurva easeOutQuart, tick otomatis
+    // melambat mengikuti animasi slot.
+    var lastTick = -1;
+    _roll.addListener(() {
+      final idx = (_roll.value * 44).floor();
+      if (idx != lastTick) {
+        lastTick = idx;
+        Sounds.tick();
       }
     });
     _pieces = List.generate(90, (_) => _Confetti.random(_rand));

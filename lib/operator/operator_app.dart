@@ -22,6 +22,7 @@ class _OperatorAppState extends State<OperatorApp> {
   int _tab = 0;
   WindowController? _audienceController;
   bool _audienceOpen = false;
+  bool _audienceMuted = false;
   bool _openingAudience = false; // cegah klik ganda -> window dobel
 
   @override
@@ -99,6 +100,15 @@ class _OperatorAppState extends State<OperatorApp> {
     }
   }
 
+  /// Bisukan / nyalakan efek suara layar penonton (mis. saat MC berbicara).
+  void _toggleAudienceMute() {
+    final muted = !_audienceMuted;
+    if (mounted) setState(() => _audienceMuted = muted);
+    AudienceChannel.send(AudienceProtocol.audienceMute, {
+      AudienceProtocol.argMuted: muted,
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final tabs = [
@@ -169,6 +179,18 @@ class _OperatorAppState extends State<OperatorApp> {
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13)),
                         const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: _audienceMuted
+                              ? 'Nyalakan suara layar penonton'
+                              : 'Bisukan suara layar penonton',
+                          icon: Icon(
+                              _audienceMuted
+                                  ? Icons.volume_off
+                                  : Icons.volume_up,
+                              size: 18),
+                          color: OpTheme.success,
+                          onPressed: _toggleAudienceMute,
+                        ),
                         IconButton(
                           tooltip: 'Reset ke splash',
                           icon: const Icon(Icons.refresh, size: 18),
