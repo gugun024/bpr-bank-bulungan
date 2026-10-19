@@ -130,6 +130,9 @@ Future<Uint8List> _buildPdf(_PdfJob job) async {
               style: pw.TextStyle(font: font, fontSize: 11, color: gold)),
         );
     return pw.Stack(
+      // PENTING: isi penuh sel grid agar semua kupon ukurannya seragam,
+      // tidak menciut mengikuti panjang teks.
+      fit: pw.StackFit.expand,
       children: [
         pw.Container(
           decoration: pw.BoxDecoration(
