@@ -24,7 +24,7 @@ class AudienceApp extends StatefulWidget {
   State<AudienceApp> createState() => _AudienceAppState();
 }
 
-enum _Stage { idle, shuffle, winner }
+enum _Stage { idle, shuffle, winner, rejected }
 
 /// Faktor skala responsif untuk layar penonton: 1.0 pada 1920x1080,
 /// mengecil di proyektor 720p, membesar di 4K (dibatasi 0.5–1.6).
@@ -43,6 +43,8 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   String _coupon = '';
   String _nama = '';
   String _hadiah = '';
+  String _rejectedRekening = '';
+  String _rejectedWaktu = '';
   String _rolling = '000000';
   Timer? _rollTimer;
   final _rand = Random();
@@ -133,6 +135,22 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           if (_stage != _Stage.shuffle) _stage = _Stage.idle;
         });
         break;
+      case AudienceProtocol.showRejected:
+        _stopRoll();
+        final rejArgs = (call.arguments as Map?) ?? {};
+        setState(() {
+          _coupon = (rejArgs[AudienceProtocol.argCoupon] ?? '').toString();
+          _nama = (rejArgs[AudienceProtocol.argNama] ?? '').toString();
+          _rejectedRekening =
+              (rejArgs[AudienceProtocol.argRekening] ?? '').toString();
+          _hadiah = (rejArgs[AudienceProtocol.argHadiah] ?? '').toString();
+          _rejectedWaktu =
+              (rejArgs[AudienceProtocol.argWaktu] ?? '').toString();
+          _stage = _Stage.rejected;
+        });
+        // Sengaja tanpa bunyi fanfare & tanpa confetti — ini peringatan,
+        // bukan perayaan.
+        break;
       case AudienceProtocol.audienceMute:
         final args = (call.arguments as Map?) ?? {};
         final m = args[AudienceProtocol.argMuted];
@@ -182,6 +200,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
                   _Stage.idle => _idleView(s),
                   _Stage.shuffle => _shuffleView(s),
                   _Stage.winner => _winnerView(s),
+                  _Stage.rejected => _rejectedView(s),
                 },
               ),
             ],
@@ -228,6 +247,102 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         hadiah: _hadiah,
         scale: s,
       );
+
+  /// Tampilan penolakan: kupon sudah pernah menang.
+  /// Gaya peringatan (amber) — beda dari perayaan pemenang (emas),
+  /// tanpa fanfare & tanpa confetti.
+  Widget _rejectedView(double s) {
+    const amber = Color(0xFFF59E0B);
+    const amberLight = Color(0xFFFCD34D);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 110 * s,
+          height: 110 * s,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: amber, width: 4),
+            color: const Color(0x22F59E0B),
+          ),
+          child: Icon(Icons.block, size: 60 * s, color: amber),
+        ),
+        SizedBox(height: 28 * s),
+        Text(
+          'KUPON SUDAH MENANG',
+          style: AudienceTheme.title(56 * s).copyWith(color: amberLight),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: 24 * s),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 56 * s, vertical: 20 * s),
+          decoration: BoxDecoration(
+            border: Border.all(color: amber, width: 3),
+            borderRadius: BorderRadius.circular(20 * s),
+            color: const Color(0x22000000),
+          ),
+          child: Text(
+            _coupon,
+            style: TextStyle(
+              fontSize: 84 * s,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 12 * s,
+              color: amberLight,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+        SizedBox(height: 24 * s),
+        Text(
+          _nama,
+          style: TextStyle(
+            fontSize: 44 * s,
+            fontWeight: FontWeight.w700,
+            color: AudienceTheme.white,
+            letterSpacing: 2 * s,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: 8 * s),
+        if (_rejectedRekening.isNotEmpty)
+          Text(
+            'Rek. $_rejectedRekening',
+            style: TextStyle(fontSize: 26 * s, color: AudienceTheme.white70),
+            textAlign: TextAlign.center,
+          ),
+        if (_hadiah.isNotEmpty)
+          Text(
+            'Sebelumnya memenangkan "$_hadiah"',
+            style: TextStyle(fontSize: 30 * s, color: AudienceTheme.white70),
+            textAlign: TextAlign.center,
+          ),
+        if (_rejectedWaktu.isNotEmpty)
+          Text(
+            'pada $_rejectedWaktu',
+            style: TextStyle(fontSize: 26 * s, color: AudienceTheme.white70),
+            textAlign: TextAlign.center,
+          ),
+        SizedBox(height: 32 * s),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 40 * s, vertical: 14 * s),
+          decoration: BoxDecoration(
+            border: Border.all(color: amber, width: 2),
+            borderRadius: BorderRadius.circular(999),
+            color: const Color(0x22F59E0B),
+          ),
+          child: Text(
+            'SILAKAN UNDI ULANG',
+            style: TextStyle(
+              fontSize: 30 * s,
+              fontWeight: FontWeight.w700,
+              color: amberLight,
+              letterSpacing: 3 * s,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _prizeChip(double s, String hadiah) => Container(
         padding: EdgeInsets.symmetric(horizontal: 40 * s, vertical: 16 * s),

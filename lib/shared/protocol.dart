@@ -16,6 +16,13 @@ class AudienceProtocol {
   /// args: {hadiah: String} — tampilkan hadiah yang sedang diundi
   static const String showPrize = 'showPrize';
 
+  /// operator → penonton: tampilkan info penolakan
+  /// (kupon sudah pernah menang — opsional, dikontrol toggle operator).
+  /// args: {coupon: String, nama: String, rekening: String,
+  ///         hadiah: String, waktu: String}
+  /// TIDAK memicu fanfare/confetti — murni tampilan peringatan.
+  static const String showRejected = 'showRejected';
+
   /// audience → operator: window penonton disembunyikan (mis. Alt+F4).
   /// Tidak ada args.
   static const String audienceHidden = 'audienceHidden';
@@ -28,6 +35,8 @@ class AudienceProtocol {
   static const String argNama = 'nama';
   static const String argHadiah = 'hadiah';
   static const String argMuted = 'muted';
+  static const String argRekening = 'rekening';
+  static const String argWaktu = 'waktu';
 }
 
 /// Pengirim perintah ke window penonton (dipakai window operator).

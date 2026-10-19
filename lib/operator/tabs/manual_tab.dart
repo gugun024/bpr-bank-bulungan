@@ -28,6 +28,9 @@ class _ManualTabState extends State<ManualTab> {
   Map<int, int> _remaining = {}; // prizeId -> sisa kuota
   bool _busy = false;
   int _couponWidth = 6;
+  // Tampilkan info penolakan (kupon sudah menang) ke layar penonton?
+  // Default mati — penolakan hanya tampil di operator.
+  bool _showRejectedOnAudience = false;
 
   @override
   void initState() {
@@ -110,6 +113,17 @@ class _ManualTabState extends State<ManualTab> {
             'Kupon ${Account.formatCoupon(n, _couponWidth)} milik ${res.account.nama} '
                 '(${res.account.rekening}) SUDAH MENANG${prize != null ? ' "$prize"' : ''}'
                 '${whenStr.isNotEmpty ? ' pada $whenStr' : ''}. Undi ulang!');
+        // Opsional: teruskan info penolakan ke layar penonton.
+        if (_showRejectedOnAudience) {
+          await AudienceChannel.send(AudienceProtocol.showRejected, {
+            AudienceProtocol.argCoupon:
+                Account.formatCoupon(n, _couponWidth),
+            AudienceProtocol.argNama: res.account.nama,
+            AudienceProtocol.argRekening: res.account.rekening,
+            AudienceProtocol.argHadiah: prize ?? '',
+            AudienceProtocol.argWaktu: whenStr,
+          });
+        }
         return;
       }
       setState(() => _found = res);
@@ -268,6 +282,29 @@ class _ManualTabState extends State<ManualTab> {
                               ),
                               icon: const Icon(Icons.refresh),
                               label: const Text('Reset'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Opsi: tampilkan penolakan (kupon sudah menang)
+                        // ke layar penonton atau hanya di operator.
+                        Row(
+                          children: [
+                            const Icon(Icons.monitor_outlined,
+                                size: 18, color: OpTheme.textMuted),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Tampilkan penolakan di layar penonton',
+                                style: TextStyle(
+                                    fontSize: 13, color: OpTheme.textMuted),
+                              ),
+                            ),
+                            Switch(
+                              value: _showRejectedOnAudience,
+                              activeThumbColor: OpTheme.navy,
+                              onChanged: (v) => setState(
+                                  () => _showRejectedOnAudience = v),
                             ),
                           ],
                         ),
