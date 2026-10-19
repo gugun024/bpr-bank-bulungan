@@ -1,7 +1,7 @@
 name: undian_bank
 description: Aplikasi undian berhadiah PT. BPR Bank Bulungan (Flutter Windows) - window operator + window penonton.
 publish_to: 'none'
-version: 1.0.6+7
+version: 1.0.7+8
 
 environment:
   sdk: ^3.4.0
