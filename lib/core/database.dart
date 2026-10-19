@@ -36,41 +36,81 @@ class DatabaseHelper {
     return databaseFactoryFfi.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 2,
         onCreate: (db, version) async {
-          await db.execute('''
-            CREATE TABLE accounts(
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              rekening TEXT UNIQUE NOT NULL,
-              rekening_lama TEXT NOT NULL DEFAULT '',
-              nama TEXT NOT NULL DEFAULT '',
-              alamat TEXT NOT NULL DEFAULT '',
-              saldo INTEGER NOT NULL DEFAULT 0,
-              kupon_count INTEGER NOT NULL DEFAULT 0,
-              coupon_start INTEGER NOT NULL DEFAULT 0,
-              coupon_end INTEGER NOT NULL DEFAULT 0,
-              has_won INTEGER NOT NULL DEFAULT 0
-            )''');
-          await db.execute(
-              'CREATE INDEX idx_accounts_coupon ON accounts(coupon_start, coupon_end)');
-          await db.execute('''
-            CREATE TABLE prizes(
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              name TEXT NOT NULL,
-              urutan INTEGER NOT NULL DEFAULT 0,
-              qty INTEGER NOT NULL DEFAULT 1
-            )''');
-          await db.execute('''
-            CREATE TABLE winners(
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              coupon_no INTEGER NOT NULL,
-              account_id INTEGER NOT NULL,
-              prize_id INTEGER NOT NULL,
-              mode TEXT NOT NULL,
-              drawn_at TEXT NOT NULL
-            )''');
+          await _createV1(db);
+          await _createSettings(db);
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          // v1 → v2: tambah tabel settings (tanpa mengganggu data).
+          if (oldVersion < 2) await _createSettings(db);
         },
       ),
+    );
+  }
+
+  /// Skema awal (v1): accounts, prizes, winners.
+  static Future<void> _createV1(Database db) async {
+    await db.execute('''
+      CREATE TABLE accounts(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rekening TEXT UNIQUE NOT NULL,
+        rekening_lama TEXT NOT NULL DEFAULT '',
+        nama TEXT NOT NULL DEFAULT '',
+        alamat TEXT NOT NULL DEFAULT '',
+        saldo INTEGER NOT NULL DEFAULT 0,
+        kupon_count INTEGER NOT NULL DEFAULT 0,
+        coupon_start INTEGER NOT NULL DEFAULT 0,
+        coupon_end INTEGER NOT NULL DEFAULT 0,
+        has_won INTEGER NOT NULL DEFAULT 0
+      )''');
+    await db.execute(
+        'CREATE INDEX idx_accounts_coupon ON accounts(coupon_start, coupon_end)');
+    await db.execute('''
+      CREATE TABLE prizes(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        urutan INTEGER NOT NULL DEFAULT 0,
+        qty INTEGER NOT NULL DEFAULT 1
+      )''');
+    await db.execute('''
+      CREATE TABLE winners(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        coupon_no INTEGER NOT NULL,
+        account_id INTEGER NOT NULL,
+        prize_id INTEGER NOT NULL,
+        mode TEXT NOT NULL,
+        drawn_at TEXT NOT NULL
+      )''');
+  }
+
+  /// Tabel settings (v2): key-value untuk preferensi operator.
+  static Future<void> _createSettings(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS settings(
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL DEFAULT ''
+      )''');
+  }
+
+  // ---------- settings ----------
+
+  /// Ambil nilai setting; null bila belum pernah disimpan.
+  Future<String?> getSetting(String key) async {
+    final d = await db;
+    final r = await d.query('settings',
+        columns: ['value'], where: 'key = ?', whereArgs: [key], limit: 1);
+    if (r.isEmpty) return null;
+    return r.first['value'] as String?;
+  }
+
+  /// Simpan nilai setting (insert atau update).
+  Future<void> setSetting(String key, String value) async {
+    final d = await db;
+    await d.insert(
+      'settings',
+      {'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 

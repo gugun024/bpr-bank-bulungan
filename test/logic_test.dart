@@ -306,4 +306,18 @@ void main() {
         mode: 'manual');
     expect(await svc.drawRandom(), isNull);
   });
+
+  test('settings: simpan & baca preferensi toggle', () async {
+    final db = DatabaseHelper.instance;
+    // Belum pernah disimpan → null.
+    expect(await db.getSetting('show_rejected_on_audience'), isNull);
+    // Simpan & baca kembali.
+    await db.setSetting('show_rejected_on_audience', '1');
+    expect(await db.getSetting('show_rejected_on_audience'), '1');
+    // Update nilai.
+    await db.setSetting('show_rejected_on_audience', '0');
+    expect(await db.getSetting('show_rejected_on_audience'), '0');
+    // Key lain tidak terganggu.
+    expect(await db.getSetting('tidak_ada'), isNull);
+  });
 }

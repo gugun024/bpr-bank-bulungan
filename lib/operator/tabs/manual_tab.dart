@@ -29,13 +29,29 @@ class _ManualTabState extends State<ManualTab> {
   bool _busy = false;
   int _couponWidth = 6;
   // Tampilkan info penolakan (kupon sudah menang) ke layar penonton?
-  // Default mati — penolakan hanya tampil di operator.
+  // Default mati — penolakan hanya tampil di operator. Disimpan di DB.
+  static const _kShowRejected = 'show_rejected_on_audience';
   bool _showRejectedOnAudience = false;
 
   @override
   void initState() {
     super.initState();
     _loadPrizes();
+    _loadToggle();
+  }
+
+  /// Muat preferensi toggle dari database.
+  Future<void> _loadToggle() async {
+    final v =
+        await DatabaseHelper.instance.getSetting(_kShowRejected);
+    if (!mounted) return;
+    setState(() => _showRejectedOnAudience = v == '1');
+  }
+
+  /// Simpan preferensi toggle ke database.
+  Future<void> _saveToggle(bool v) async {
+    setState(() => _showRejectedOnAudience = v);
+    await DatabaseHelper.instance.setSetting(_kShowRejected, v ? '1' : '0');
   }
 
   int _left(Prize p) => _remaining[p.id] ?? p.qty;
@@ -303,8 +319,7 @@ class _ManualTabState extends State<ManualTab> {
                             Switch(
                               value: _showRejectedOnAudience,
                               activeThumbColor: OpTheme.navy,
-                              onChanged: (v) => setState(
-                                  () => _showRejectedOnAudience = v),
+                              onChanged: _saveToggle,
                             ),
                           ],
                         ),
