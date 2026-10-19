@@ -241,6 +241,29 @@ class DatabaseHelper {
     return (r.first['c'] as int?) ?? 0;
   }
 
+  /// Jumlah seluruh pemenang tercatat (untuk guard import hadiah).
+  Future<int> countWinners() async {
+    final d = await db;
+    final r = await d.rawQuery('SELECT COUNT(*) AS c FROM winners');
+    return (r.first['c'] as int?) ?? 0;
+  }
+
+  /// Ganti seluruh daftar hadiah (dipakai import CSV).
+  /// Urutan mengikuti urutan baris file (1-based).
+  Future<void> replaceAllPrizes(List<Prize> prizes) async {
+    final d = await db;
+    await d.transaction((txn) async {
+      await txn.delete('prizes');
+      final batch = txn.batch();
+      for (var i = 0; i < prizes.length; i++) {
+        final p = prizes[i];
+        batch.insert('prizes',
+            {'name': p.name, 'urutan': i + 1, 'qty': p.qty < 1 ? 1 : p.qty});
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
   // ---------- winners ----------
 
   Future<int> insertWinner(Winner w) async {

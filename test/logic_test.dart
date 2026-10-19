@@ -320,4 +320,48 @@ void main() {
     // Key lain tidak terganggu.
     expect(await db.getSetting('tidak_ada'), isNull);
   });
+
+  test('import hadiah: autoMap + buildPrizes + replaceAllPrizes', () async {
+    // AutoMap mengenali header Indonesia/Inggris.
+    var m = PrizeImportService.autoMap(['Nama Hadiah', 'Jumlah']);
+    expect(m.nama, 0);
+    expect(m.qty, 1);
+    m = PrizeImportService.autoMap(['prize', 'qty']);
+    expect(m.nama, 0);
+    expect(m.qty, 1);
+    // Fallback: 2 kolom tanpa header dikenali.
+    m = PrizeImportService.autoMap(['A', 'B']);
+    expect(m.nama, 0);
+    expect(m.qty, 1);
+
+    // buildPrizes: baris tanpa nama dilewati, qty invalid → 1.
+    final preview = ImportPreview(
+      ['nama', 'qty'],
+      [
+        ['Sepeda', '6'],
+        ['Kulkas', '2'],
+        ['', '5'], // tanpa nama → dilewati
+        ['TV', 'abc'], // qty invalid → 1
+        ['Motor', '0'], // qty 0 → 1
+      ],
+    );
+    final prizes = PrizeImportService.buildPrizes(
+        preview, PrizeColumnMapping(nama: 0, qty: 1));
+    expect(prizes.length, 4);
+    expect(prizes[0].name, 'Sepeda');
+    expect(prizes[0].qty, 6);
+    expect(prizes[2].qty, 1);
+    expect(prizes[3].qty, 1);
+
+    // replaceAllPrizes: mengganti seluruh daftar, urutan 1-based.
+    final db = DatabaseHelper.instance;
+    await db.replaceAllPrizes(prizes);
+    final saved = await db.getPrizes();
+    expect(saved.length, 4);
+    expect(saved[0].name, 'Sepeda');
+    expect(saved[0].urutan, 1);
+    expect(saved[3].urutan, 4);
+    // countWinners = 0 (belum ada undian).
+    expect(await db.countWinners(), 0);
+  });
 }

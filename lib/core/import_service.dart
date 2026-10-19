@@ -294,3 +294,56 @@ class ImportValidation {
 
 /// Helper baca bytes file (dipakai untuk sniffing sederhana).
 Future<Uint8List> readFileBytes(String path) => File(path).readAsBytes();
+
+/// Mapping kolom untuk import hadiah (nama + jumlah).
+class PrizeColumnMapping {
+  int nama;
+  int qty;
+  PrizeColumnMapping({this.nama = -1, this.qty = -1});
+  bool get valid => nama >= 0 && qty >= 0;
+}
+
+/// Import hadiah dari CSV/Excel: 2 kolom (nama hadiah, jumlah unit).
+class PrizeImportService {
+  /// Tebak kolom nama & jumlah dari header. Fallback: kolom 1 = nama,
+  /// kolom 2 = jumlah bila header tidak dikenali.
+  static PrizeColumnMapping autoMap(List<String> headers) {
+    final m = PrizeColumnMapping();
+    for (var i = 0; i < headers.length; i++) {
+      final h = ' ${headers[i].toLowerCase()} ';
+      if (m.nama == -1 &&
+          (h.contains('nama') ||
+              h.contains('name') ||
+              h.contains('hadiah') ||
+              h.contains('prize'))) {
+        m.nama = i;
+      } else if (m.qty == -1 &&
+          (h.contains('qty') ||
+              h.contains('jumlah') ||
+              h.contains('quantity') ||
+              h.contains('unit') ||
+              h.contains('banyak'))) {
+        m.qty = i;
+      }
+    }
+    if (m.nama == -1 && headers.isNotEmpty) m.nama = 0;
+    if (m.qty == -1 && headers.length > 1) m.qty = 1;
+    return m;
+  }
+
+  /// Bangun daftar Prize dari preview + mapping.
+  /// Baris tanpa nama dilewati; qty invalid/nol → 1.
+  static List<Prize> buildPrizes(
+      ImportPreview preview, PrizeColumnMapping m) {
+    final prizes = <Prize>[];
+    for (final row in preview.rows) {
+      String cell(int i) => (i >= 0 && i < row.length) ? row[i].trim() : '';
+      final name = cell(m.nama);
+      if (name.isEmpty) continue;
+      final qtyRaw = cell(m.qty).replaceAll(RegExp(r'[^0-9]'), '');
+      final qty = int.tryParse(qtyRaw) ?? 1;
+      prizes.add(Prize(name: name, urutan: 0, qty: qty < 1 ? 1 : qty));
+    }
+    return prizes;
+  }
+}

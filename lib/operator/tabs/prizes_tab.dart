@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/database.dart';
 import '../../core/models.dart';
 import '../../shared/theme.dart';
+import '../widgets/prize_import_dialog.dart';
 import '../widgets/ui_kit.dart';
 
 /// Tab kelola daftar hadiah.
@@ -92,6 +93,11 @@ class _PrizesTabState extends State<PrizesTab> {
     await _load();
   }
 
+  Future<void> _importCsv() async {
+    final ok = await showPrizeImportDialog(context);
+    if (ok) await _load();
+  }
+
   Future<void> _delete(Prize p) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -125,6 +131,18 @@ class _PrizesTabState extends State<PrizesTab> {
             subtitle:
                 'Kelola hadiah yang diundi. Urutan mengikuti waktu penambahan.',
             actions: [
+              OutlinedButton.icon(
+                onPressed: _importCsv,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 18, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.upload_file, size: 18),
+                label: const Text('Import CSV'),
+              ),
+              const SizedBox(width: 8),
               FilledButton.icon(
                 onPressed: () => _dialog(),
                 style: OpTheme.primaryButton.copyWith(
