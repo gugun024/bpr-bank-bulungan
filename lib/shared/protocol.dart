@@ -23,6 +23,12 @@ class AudienceProtocol {
   /// TIDAK memicu fanfare/confetti — murni tampilan peringatan.
   static const String showRejected = 'showRejected';
 
+  /// operator → penonton: kupon tidak terdaftar di database.
+  /// args: {coupon: String}
+  /// Dipakai di undi manual: nomor keluar di depan penonton, operator
+  /// wajib menyampaikan valid/tidaknya. Tanpa fanfare/confetti.
+  static const String showNotFound = 'showNotFound';
+
   /// audience → operator: window penonton disembunyikan (mis. Alt+F4).
   /// Tidak ada args.
   static const String audienceHidden = 'audienceHidden';

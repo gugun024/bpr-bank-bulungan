@@ -24,7 +24,7 @@ class AudienceApp extends StatefulWidget {
   State<AudienceApp> createState() => _AudienceAppState();
 }
 
-enum _Stage { idle, shuffle, winner, rejected }
+enum _Stage { idle, shuffle, winner, rejected, notFound }
 
 /// Faktor skala responsif untuk layar penonton: 1.0 pada 1920x1080,
 /// mengecil di proyektor 720p, membesar di 4K (dibatasi 0.5–1.6).
@@ -151,6 +151,15 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         // Sengaja tanpa bunyi fanfare & tanpa confetti — ini peringatan,
         // bukan perayaan.
         break;
+      case AudienceProtocol.showNotFound:
+        _stopRoll();
+        final nfArgs = (call.arguments as Map?) ?? {};
+        setState(() {
+          _coupon = (nfArgs[AudienceProtocol.argCoupon] ?? '').toString();
+          _stage = _Stage.notFound;
+        });
+        // Tanpa fanfare & confetti — hanya info validasi.
+        break;
       case AudienceProtocol.audienceMute:
         final args = (call.arguments as Map?) ?? {};
         final m = args[AudienceProtocol.argMuted];
@@ -201,6 +210,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
                   _Stage.shuffle => _shuffleView(s),
                   _Stage.winner => _winnerView(s),
                   _Stage.rejected => _rejectedView(s),
+                  _Stage.notFound => _notFoundView(s),
                 },
               ),
             ],
@@ -338,6 +348,74 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
               color: amberLight,
               letterSpacing: 3 * s,
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Tampilan validasi: kupon tidak terdaftar di database.
+  /// Dipakai di undi manual — nomor keluar di depan penonton, operator
+  /// wajib menyampaikan valid/tidaknya. Gaya peringatan (amber),
+  /// tanpa fanfare & tanpa confetti.
+  Widget _notFoundView(double s) {
+    const amber = Color(0xFFF59E0B);
+    const amberLight = Color(0xFFFCD34D);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 110 * s,
+          height: 110 * s,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: amber, width: 4),
+            color: const Color(0x22F59E0B),
+          ),
+          child: Icon(Icons.search_off, size: 60 * s, color: amber),
+        ),
+        SizedBox(height: 28 * s),
+        Text(
+          'KUPON TIDAK TERDAFTAR',
+          style: AudienceTheme.title(56 * s).copyWith(color: amberLight),
+          textAlign: TextAlign.center,
+        ),
+        SizedBox(height: 24 * s),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 56 * s, vertical: 20 * s),
+          decoration: BoxDecoration(
+            border: Border.all(color: amber, width: 3),
+            borderRadius: BorderRadius.circular(20 * s),
+            color: const Color(0x22000000),
+          ),
+          child: Text(
+            _coupon,
+            style: TextStyle(
+              fontSize: 84 * s,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 12 * s,
+              color: amberLight,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+        SizedBox(height: 32 * s),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 40 * s, vertical: 14 * s),
+          decoration: BoxDecoration(
+            border: Border.all(color: amber, width: 2),
+            borderRadius: BorderRadius.circular(999),
+            color: const Color(0x22F59E0B),
+          ),
+          child: Text(
+            'MOHON PERIKSA KEMBALI NOMOR KUPON',
+            style: TextStyle(
+              fontSize: 28 * s,
+              fontWeight: FontWeight.w700,
+              color: amberLight,
+              letterSpacing: 2 * s,
+            ),
+            textAlign: TextAlign.center,
           ),
         ),
       ],

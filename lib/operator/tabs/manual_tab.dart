@@ -108,8 +108,16 @@ class _ManualTabState extends State<ManualTab> {
       }
       final res = await _svc.lookupCoupon(n);
       if (res == null) {
+        final couponStr = Account.formatCoupon(n, _couponWidth);
         setState(() => _error =
-            'Kupon ${Account.formatCoupon(n, _couponWidth)} tidak dikenal.');
+            'Kupon $couponStr tidak terdaftar. Periksa ketikan & coba lagi.');
+        // Nomor keluar di depan penonton — sampaikan valid/tidaknya
+        // bila toggle aktif.
+        if (_showRejectedOnAudience) {
+          await AudienceChannel.send(AudienceProtocol.showNotFound, {
+            AudienceProtocol.argCoupon: couponStr,
+          });
+        }
         return;
       }
       if (res.account.hasWon) {
@@ -311,7 +319,7 @@ class _ManualTabState extends State<ManualTab> {
                             const SizedBox(width: 8),
                             const Expanded(
                               child: Text(
-                                'Tampilkan penolakan di layar penonton',
+                                'Tampilkan hasil validasi di layar penonton',
                                 style: TextStyle(
                                     fontSize: 13, color: OpTheme.textMuted),
                               ),
