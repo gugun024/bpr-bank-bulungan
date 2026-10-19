@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -32,7 +33,7 @@ class ImportService {
   static Future<ImportPreview> parseFile(String path) async {
     final lower = path.toLowerCase();
     if (lower.endsWith('.csv')) {
-      final text = await File(path).readAsString();
+      final text = await _readCsvText(path);
       final rows = const CsvToListConverter().convert(text, eol: '\n');
       return _toPreview(rows);
     }
@@ -44,6 +45,22 @@ class ImportService {
         .map((r) => r.map((c) => _cellString(c?.value)).toList())
         .toList();
     return _toPreview(rows);
+  }
+
+  /// Baca CSV sebagai teks. Coba UTF-8 dulu; kalau gagal (mis. file
+  /// simpanan Excel Indonesia yang pakai Windows-1252), fallback ke latin1
+  /// agar tidak error "failed to decode data using encoding utf-8".
+  /// Juga buang BOM di awal bila ada.
+  static Future<String> _readCsvText(String path) async {
+    final bytes = await File(path).readAsBytes();
+    String text;
+    try {
+      text = utf8.decode(bytes);
+    } catch (_) {
+      text = latin1.decode(bytes);
+    }
+    if (text.startsWith('﻿')) text = text.substring(1);
+    return text;
   }
 
   static ImportPreview _toPreview(List<List<dynamic>> rows) {

@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -363,5 +365,23 @@ void main() {
     expect(saved[3].urutan, 4);
     // countWinners = 0 (belum ada undian).
     expect(await db.countWinners(), 0);
+  });
+
+  test('parseFile CSV: fallback latin1 bila bukan UTF-8', () async {
+    // Simulasi CSV simpanan Excel Indonesia (Windows-1252): byte 0xE9
+    // ("é") tidak valid sebagai UTF-8.
+    final dir = await Directory.systemTemp.createTemp('csv_test');
+    final path = '${dir.path}/hadiah.csv';
+    final bytes = <int>[
+      ...utf8.encode('nama,qty\n'),
+      ...latin1.encode('Kipas Anginé,3\n'),
+    ];
+    await File(path).writeAsBytes(bytes);
+    // Tanpa fallback, ini akan throw "failed to decode using utf-8".
+    final preview = await ImportService.parseFile(path);
+    expect(preview.headers, ['nama', 'qty']);
+    expect(preview.rows.length, 1);
+    expect(preview.rows.first.first, 'Kipas Anginé');
+    await dir.delete(recursive: true);
   });
 }
