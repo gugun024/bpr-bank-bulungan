@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/database.dart';
 import '../../core/models.dart';
 import '../../shared/theme.dart';
+import '../widgets/coupon_print_dialog.dart';
 import '../widgets/import_dialog.dart';
 import '../widgets/ui_kit.dart';
 
@@ -125,6 +126,23 @@ class _DataTabState extends State<DataTab> {
           subtitle:
               '$_total rekening • $_totalCoupons kupon total. Kupon memakai rentang nomor berurutan.',
           actions: [
+            OutlinedButton.icon(
+              onPressed: () => showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) =>
+                    CouponPrintDialog(db: DatabaseHelper.instance),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 18, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.print_outlined, size: 18),
+              label: const Text('Cetak Kupon'),
+            ),
+            const SizedBox(width: 8),
             FilledButton.icon(
               onPressed: _openImport,
               style: OpTheme.primaryButton.copyWith(

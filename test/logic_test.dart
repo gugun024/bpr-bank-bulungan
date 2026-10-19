@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:undian_bank/audience/audience_app.dart';
+import 'package:undian_bank/core/coupon_export.dart';
 import 'package:undian_bank/core/database.dart';
 import 'package:undian_bank/core/draw_service.dart';
 import 'package:undian_bank/core/import_service.dart';
@@ -383,5 +384,23 @@ void main() {
     expect(preview.rows.length, 1);
     expect(preview.rows.first.first, 'Kipas Anginé');
     await dir.delete(recursive: true);
+  });
+
+  test('coupon export: batch count, range & lebar nomor', () {
+    expect(CouponExportService.batchCount(0), 0);
+    expect(CouponExportService.batchCount(10000), 1);
+    expect(CouponExportService.batchCount(10001), 2);
+    expect(CouponExportService.batchCount(109801), 11);
+
+    final coupons = List.generate(
+      25000,
+      (i) => CouponPrint(no: i + 1, nama: 'A', rekening: 'R'),
+    );
+    expect(CouponExportService.batchRange(coupons, 0), (1, 10000));
+    expect(CouponExportService.batchRange(coupons, 2), (20001, 25000));
+
+    expect(CouponExportService.couponWidth(109801), 6);
+    expect(CouponExportService.couponWidth(1500000), 7);
+    expect(CouponExportService.couponWidth(5), 6);
   });
 }
