@@ -75,7 +75,7 @@ class _CouponPrintDialogState extends State<CouponPrintDialog> {
       String? singlePath;
       if (indices.length > 1) {
         dir = await FilePicker.platform.getDirectoryPath(
-          dialogTitle: 'Pilih folder untuk ${_batchCount} file PDF',
+          dialogTitle: 'Pilih folder untuk $_batchCount file PDF',
         );
         if (dir == null) {
           if (mounted) setState(() => _busy = false);
