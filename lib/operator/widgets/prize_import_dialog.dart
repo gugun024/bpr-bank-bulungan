@@ -5,6 +5,7 @@ import '../../core/database.dart';
 import '../../core/import_service.dart';
 import '../../core/models.dart';
 import '../../shared/theme.dart';
+import 'sample_download.dart';
 
 /// Dialog import hadiah dari CSV/Excel → SQLite.
 ///
@@ -50,6 +51,18 @@ class _PrizeImportDialogState extends State<PrizeImportDialog> {
   Future<void> _checkWinners() async {
     final n = await DatabaseHelper.instance.countWinners();
     if (mounted) setState(() => _winnerCount = n);
+  }
+
+  Future<void> _downloadSample() async {
+    setState(() => _status = null);
+    final path = await downloadSampleCsv(
+      assetPath: 'assets/samples/contoh-hadiah.csv',
+      suggestedName: 'contoh-hadiah.csv',
+    );
+    if (!mounted) return;
+    setState(() => _status = path == null
+        ? null
+        : 'Contoh tersimpan: $path');
   }
 
   Future<void> _pick() async {
@@ -217,6 +230,18 @@ class _PrizeImportDialogState extends State<PrizeImportDialog> {
                             style: OpTheme.primaryButton,
                             icon: const Icon(Icons.folder_open),
                             label: const Text('Pilih File'),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: _busy ? null : _downloadSample,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: const Icon(Icons.download, size: 18),
+                            label: const Text('Contoh CSV'),
                           ),
                           const SizedBox(width: 12),
                           if (_fileName != null)

@@ -32,3 +32,5 @@ flutter:
   assets:
     - assets/sounds/tick.wav
     - assets/sounds/fanfare.wav
+    - assets/samples/contoh-hadiah.csv
+    - assets/samples/contoh-nasabah.csv

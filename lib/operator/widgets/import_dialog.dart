@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/database.dart';
 import '../../core/import_service.dart';
 import '../../shared/theme.dart';
+import 'sample_download.dart';
 
 /// Dialog import Excel/CSV → SQLite dengan mapping kolom manual.
 ///
@@ -40,6 +41,17 @@ class _ImportDialogState extends State<ImportDialog> {
       return;
     }
     _validation = ImportService.validateImport(preview, _map);
+  }
+
+  Future<void> _downloadSample() async {
+    setState(() => _status = null);
+    final path = await downloadSampleCsv(
+      assetPath: 'assets/samples/contoh-nasabah.csv',
+      suggestedName: 'contoh-nasabah.csv',
+    );
+    if (!mounted) return;
+    setState(() => _status =
+        path == null ? null : 'Contoh tersimpan: $path');
   }
 
   Future<void> _pick() async {
@@ -182,6 +194,18 @@ class _ImportDialogState extends State<ImportDialog> {
                           style: OpTheme.primaryButton,
                           icon: const Icon(Icons.folder_open),
                           label: const Text('Pilih File'),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: _busy ? null : _downloadSample,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.download, size: 18),
+                          label: const Text('Contoh CSV'),
                         ),
                         const SizedBox(width: 12),
                         if (_fileName != null)
