@@ -267,7 +267,10 @@ class _ManualTabState extends State<ManualTab> {
                           autofocus: true,
                           keyboardType: TextInputType.number,
                           inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
+                            FilteringTextInputFormatter.digitsOnly,
+                            // Batasi sesuai lebar kupon aktif (min 6 digit,
+                            // menyesuaikan total data).
+                            LengthLimitingTextInputFormatter(_couponWidth),
                           ],
                           style: const TextStyle(
                             fontSize: 28,
