@@ -21,6 +21,7 @@ dependencies:
   intl: ^0.20.2
   path: ^1.9.1 # dipakai langsung oleh lib/core/database.dart & history_tab.dart
   audioplayers: ^6.7.1
+  pdf: ^3.11.3 # export kupon ke PDF siap cetak
 
 dev_dependencies:
   flutter_test:
@@ -34,3 +35,5 @@ flutter:
     - assets/sounds/fanfare.wav
     - assets/samples/contoh-hadiah.csv
     - assets/samples/contoh-nasabah.csv
+    - assets/fonts/DejaVuSans.ttf
+    - assets/fonts/DejaVuSans-Bold.ttf
