@@ -215,8 +215,10 @@ class _ManualTabState extends State<ManualTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-        child: Column(
+    // Layout: header tetap di atas; kiri (daftar hadiah) scroll mandiri;
+    // kanan: kartu input kupon FIXED (tidak ikut scroll), hasil di bawahnya
+    // scroll mandiri bila kontennya panjang.
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const TabHeader(
@@ -225,43 +227,46 @@ class _ManualTabState extends State<ManualTab> {
               'Pilih hadiah dulu, lalu ketik nomor kupon dari alat roll dan tampilkan ke layar penonton.',
         ),
         const SizedBox(height: 20),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // KIRI: pilih hadiah
-            Expanded(
-              flex: 5,
-              child: OpCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text('Hadiah yang diundi',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: OpTheme.navy)),
-                    const SizedBox(height: 8),
-                    PrizePicker(
-                      prizes: _prizes,
-                      remainingOf: _left,
-                      selected: _prize,
-                      onChanged: _onPrizeChanged,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            // KANAN: ketik kupon + hasil
-            Expanded(
-              flex: 6,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  OpCard(
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // KIRI: pilih hadiah (scroll mandiri)
+              Expanded(
+                flex: 5,
+                child: SingleChildScrollView(
+                  child: OpCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        const Text('Hadiah yang diundi',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: OpTheme.navy)),
+                        const SizedBox(height: 8),
+                        PrizePicker(
+                          prizes: _prizes,
+                          remainingOf: _left,
+                          selected: _prize,
+                          onChanged: _onPrizeChanged,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // KANAN: input kupon FIXED + hasil (scroll mandiri)
+              Expanded(
+                flex: 6,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    OpCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                         TextField(
                           controller: _couponCtrl,
                           autofocus: true,
@@ -337,20 +342,33 @@ class _ManualTabState extends State<ManualTab> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  if (_busy) const LinearProgressIndicator(),
-                  if (_error != null)
-                    _banner(_error!, OpTheme.danger, Icons.error_outline),
-                  if (_rejectedInfo != null)
-                    _banner(_rejectedInfo!, OpTheme.danger, Icons.block,
-                        big: true),
-                  if (_found != null) _accountCard(_found!),
+                  // Hasil: banner error/penolakan & kartu akun — scroll
+                  // mandiri, input kupon di atas tetap tidak bergerak.
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_busy) const LinearProgressIndicator(),
+                          if (_error != null)
+                            _banner(_error!, OpTheme.danger,
+                                Icons.error_outline),
+                          if (_rejectedInfo != null)
+                            _banner(_rejectedInfo!, OpTheme.danger,
+                                Icons.block,
+                                big: true),
+                          if (_found != null) _accountCard(_found!),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
           ],
         ),
-      ],
-    ));
+      ),
+    ]);
   }
 
   Widget _banner(String text, Color color, IconData icon, {bool big = false}) {
