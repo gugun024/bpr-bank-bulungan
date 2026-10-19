@@ -60,6 +60,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
     _goFullscreen();
     _channel.setMethodCallHandler(_onMethod);
     windowManager.addListener(this);
+    Sounds.warmUp(); // pemanasan audio agar tick/fanfare siap bunyi
   }
 
   Future<void> _goFullscreen() async {

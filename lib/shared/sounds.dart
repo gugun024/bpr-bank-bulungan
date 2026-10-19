@@ -1,26 +1,40 @@
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 
 /// Efek suara layar penonton: tick saat mengocok & fanfare saat pemenang
-/// dikunci. Semua pemanggilan aman — gagal diam-diam bila plugin audio
-/// belum siap (mis. sub-window tanpa registrasi plugin).
+/// dikunci.
+///
+/// Catatan Windows: PlayerMode.lowLatency hanya untuk Android (SoundPool);
+/// di Windows pakai mediaPlayer agar bunyi keluar.
 class Sounds {
   Sounds._();
 
   static AudioPool? _tickPool;
   static final AudioPlayer _fanfarePlayer = AudioPlayer();
   static bool _muted = false;
+  static bool _poolFailed = false;
 
   static void setMuted(bool v) => _muted = v;
 
+  /// Panggil sekali saat aplikasi penonton dibuka — pemanasan audio
+  /// supaya tick pertama tidak delay/gagal.
+  static Future<void> warmUp() async {
+    await _ensureTickPool();
+  }
+
   static Future<void> _ensureTickPool() async {
-    if (_tickPool != null) return;
+    if (_tickPool != null || _poolFailed) return;
     try {
       _tickPool = await AudioPool.createFromAsset(
         path: 'assets/sounds/tick.wav',
         maxPlayers: 4,
-        playerMode: PlayerMode.lowLatency,
+        // mediaPlayer: kompatibel semua platform (lowLatency = Android saja).
+        playerMode: PlayerMode.mediaPlayer,
       );
-    } catch (_) {}
+    } catch (e) {
+      _poolFailed = true;
+      debugPrint('[Sounds] AudioPool gagal dibuat: $e');
+    }
   }
 
   /// Tick pendek — panggil tiap frame roll kocokan / slot.
@@ -30,7 +44,9 @@ class Sounds {
     try {
       await _ensureTickPool();
       await _tickPool?.start(volume: 0.6);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Sounds] tick gagal: $e');
+    }
   }
 
   /// Fanfare kemenangan — dipanggil sekali saat nomor dikunci.
@@ -38,6 +54,8 @@ class Sounds {
     if (_muted) return;
     try {
       await _fanfarePlayer.play(AssetSource('assets/sounds/fanfare.wav'));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Sounds] fanfare gagal: $e');
+    }
   }
 }
