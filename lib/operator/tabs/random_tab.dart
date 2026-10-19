@@ -146,8 +146,9 @@ class _RandomTabState extends State<RandomTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-        child: Column(
+    // Layout: header + stat tetap di atas; kiri (daftar hadiah) scroll
+    // mandiri; kanan: tombol Kocok FIXED, kartu hasil scroll mandiri.
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const TabHeader(
@@ -178,63 +179,76 @@ class _RandomTabState extends State<RandomTab> {
           ],
         ),
         const SizedBox(height: 16),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // KIRI: pilih hadiah
-            Expanded(
-              flex: 5,
-              child: OpCard(
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // KIRI: pilih hadiah (scroll mandiri)
+              Expanded(
+                flex: 5,
+                child: SingleChildScrollView(
+                  child: OpCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text('Hadiah yang diundi',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: OpTheme.navy)),
+                        const SizedBox(height: 8),
+                        PrizePicker(
+                          prizes: _prizes,
+                          remainingOf: _left,
+                          selected: _prize,
+                          onChanged: _onPrizeChanged,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // KANAN: tombol Kocok FIXED + hasil (scroll mandiri)
+              Expanded(
+                flex: 6,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('Hadiah yang diundi',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: OpTheme.navy)),
-                    const SizedBox(height: 8),
-                    PrizePicker(
-                      prizes: _prizes,
-                      remainingOf: _left,
-                      selected: _prize,
-                      onChanged: _onPrizeChanged,
+                    OpCard(
+                      child: FilledButton.icon(
+                        onPressed: (_busy || _prize == null || _pool == 0)
+                            ? null
+                            : _shuffle,
+                        style: OpTheme.primaryButton.copyWith(
+                          minimumSize: WidgetStateProperty.all(
+                              const Size(double.infinity, 56)),
+                        ),
+                        icon: const Icon(Icons.casino),
+                        label: Text(
+                            _prize == null ? 'Kocok' : 'Kocok — ${_prize!.name}'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (_busy) const LinearProgressIndicator(),
+                            if (_drawn != null) _resultCard(_drawn!),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            // KANAN: kocok + hasil
-            Expanded(
-              flex: 6,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  OpCard(
-                    child: FilledButton.icon(
-                      onPressed: (_busy || _prize == null || _pool == 0)
-                          ? null
-                          : _shuffle,
-                      style: OpTheme.primaryButton.copyWith(
-                        minimumSize: WidgetStateProperty.all(
-                            const Size(double.infinity, 56)),
-                      ),
-                      icon: const Icon(Icons.casino),
-                      label: Text(
-                          _prize == null ? 'Kocok' : 'Kocok — ${_prize!.name}'),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (_busy) const LinearProgressIndicator(),
-                  if (_drawn != null) _resultCard(_drawn!),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
-    ));
+    );
   }
 
   Widget _resultCard(DrawResult res) {
