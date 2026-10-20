@@ -389,16 +389,16 @@ void main() {
 
   test('coupon export: batch count, range & lebar nomor', () {
     expect(CouponExportService.batchCount(0), 0);
-    expect(CouponExportService.batchCount(10000), 1);
-    expect(CouponExportService.batchCount(10001), 2);
-    expect(CouponExportService.batchCount(109801), 11);
+    expect(CouponExportService.batchCount(500), 1);
+    expect(CouponExportService.batchCount(501), 2);
+    expect(CouponExportService.batchCount(109801), 220);
 
     final coupons = List.generate(
       25000,
       (i) => CouponPrint(no: i + 1, nama: 'A', rekening: 'R'),
     );
-    expect(CouponExportService.batchRange(coupons, 0), (1, 10000));
-    expect(CouponExportService.batchRange(coupons, 2), (20001, 25000));
+    expect(CouponExportService.batchRange(coupons, 0), (1, 500));
+    expect(CouponExportService.batchRange(coupons, 2), (1001, 1500));
 
     expect(CouponExportService.couponWidth(109801), 6);
     expect(CouponExportService.couponWidth(1500000), 7);

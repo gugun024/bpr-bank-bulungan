@@ -9,7 +9,8 @@ import '../../shared/theme.dart';
 
 /// Dialog export kupon fisik ke PDF siap cetak.
 ///
-/// Pilihan: semua batch atau 1 batch tertentu (10.000 kupon/batch).
+/// Pilihan: semua batch atau 1 batch tertentu (500 kupon/batch, landscape
+/// 12 kupon per halaman).
 /// Tiap batch di-render di isolate agar UI tidak freeze.
 class CouponPrintDialog extends StatefulWidget {
   final DatabaseHelper db;
@@ -166,7 +167,7 @@ class _CouponPrintDialogState extends State<CouponPrintDialog> {
                       _infoRow('Total kupon',
                           '${_coupons.length} kupon'),
                       _infoRow('Total halaman A4',
-                          '±$_totalPages halaman (10 kupon/hlm)'),
+                          '±$_totalPages halaman A4 landscape (12 kupon/hlm)'),
                       _infoRow('Jumlah batch',
                           '$_batchCount file @ ${CouponExportService.batchSize} kupon'),
                       const SizedBox(height: 12),

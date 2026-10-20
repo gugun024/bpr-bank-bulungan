@@ -22,16 +22,17 @@ class CouponPrint {
 
 /// Export kupon fisik ke PDF siap cetak.
 ///
-/// Desain plek dengan mockup yang disetujui: A4, 10 kupon per halaman
-/// (2 kolom × 5 baris), bingkai ganda emas + ukiran sudut ❧, divider ✦,
-/// nomor besar, nama & rekening. Semua vektor (tanpa gambar) + font
-/// DejaVu Sans yang di-embed agar ornamen tampil di semua printer.
+/// Desain plek dengan mockup yang disetujui: A4 LANDSCAPE, 12 kupon per
+/// halaman (3 kolom × 4 baris), bingkai ganda emas + ukiran sudut ❧,
+/// divider ✦, nomor besar, nama & rekening. Semua vektor (tanpa gambar)
+/// + font DejaVu Sans yang di-embed agar ornamen tampil di semua printer.
 ///
-/// Kupon di-export per batch 10.000 agar memory tetap kecil; tiap batch
-/// di-render di isolate supaya UI tidak freeze.
+/// Kupon di-export per batch 500 agar tumpukan kertas gampang dicari
+/// manual (rentang nomor jelas per file); tiap batch di-render di isolate
+/// supaya UI tidak freeze.
 class CouponExportService {
-  static const int batchSize = 10000;
-  static const int perPage = 10;
+  static const int batchSize = 500;
+  static const int perPage = 12;
 
   /// Ambil SEMUA kupon (no, nama, rekening) diurut nomor kupon.
   /// Termasuk milik rekening yang sudah menang — ini arsip kupon fisik.
@@ -206,20 +207,20 @@ Future<Uint8List> _buildPdf(_PdfJob job) async {
         job.coupons.sublist(i, min(i + perPage, job.coupons.length));
     doc.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4,
+        pageFormat: PdfPageFormat.a4.landscape,
         margin: const pw.EdgeInsets.all(28.35), // 10mm
         build: (_) => pw.Column(
           children: [
-            for (var r = 0; r < 5; r++) ...[
+            for (var r = 0; r < 4; r++) ...[
               if (r > 0) pw.SizedBox(height: 11.34), // gap 4mm
               pw.Expanded(
                 child: pw.Row(
                   children: [
-                    for (var col = 0; col < 2; col++) ...[
+                    for (var col = 0; col < 3; col++) ...[
                       if (col > 0) pw.SizedBox(width: 11.34),
                       pw.Expanded(
-                        child: (r * 2 + col) < pageCoupons.length
-                            ? coupon(pageCoupons[r * 2 + col])
+                        child: (r * 3 + col) < pageCoupons.length
+                            ? coupon(pageCoupons[r * 3 + col])
                             : pw.Container(),
                       ),
                     ],
