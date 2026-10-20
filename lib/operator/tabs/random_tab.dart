@@ -150,6 +150,7 @@ class _RandomTabState extends State<RandomTab> {
         AudienceProtocol.argCoupon:
             Account.formatCoupon(drawn.couponNo, _couponWidth),
         AudienceProtocol.argNama: drawn.account.nama,
+        AudienceProtocol.argAlamat: drawn.account.alamat,
         AudienceProtocol.argHadiah: prize.name,
       });
       // Kocokan berhenti, ganti urutan reveal (tick melambat + fanfare).

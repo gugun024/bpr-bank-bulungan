@@ -192,6 +192,7 @@ class _ManualTabState extends State<ManualTab> {
         AudienceProtocol.argCoupon:
             Account.formatCoupon(found.couponNo, _couponWidth),
         AudienceProtocol.argNama: found.account.nama,
+        AudienceProtocol.argAlamat: found.account.alamat,
         AudienceProtocol.argHadiah: prize.name,
       });
       // Suara reveal (tick melambat 2,6 dtk + fanfare) diputar dari

@@ -42,6 +42,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   _Stage _stage = _Stage.idle;
   String _coupon = '';
   String _nama = '';
+  String _alamat = '';
   String _hadiah = '';
   String _rejectedRekening = '';
   String _rejectedWaktu = '';
@@ -138,6 +139,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         setState(() {
           _coupon = (args[AudienceProtocol.argCoupon] ?? '').toString();
           _nama = (args[AudienceProtocol.argNama] ?? '').toString();
+          _alamat = (args[AudienceProtocol.argAlamat] ?? '').toString();
           _hadiah = (args[AudienceProtocol.argHadiah] ?? '').toString();
           _stage = _Stage.winner;
         });
@@ -270,6 +272,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   Widget _winnerView(double s) => _AnimatedWinnerView(
         key: ValueKey('winner-$_coupon'),
         nama: _nama,
+        alamat: _alamat,
         coupon: _coupon,
         hadiah: _hadiah,
         scale: s,
@@ -752,12 +755,14 @@ class _SparksPainter extends CustomPainter {
 /// Layar pemenang animasi: kartu scale-in + hujan confetti emas.
 class _AnimatedWinnerView extends StatefulWidget {
   final String nama;
+  final String alamat;
   final String coupon;
   final String hadiah;
   final double scale;
   const _AnimatedWinnerView(
       {super.key,
       required this.nama,
+      required this.alamat,
       required this.coupon,
       required this.hadiah,
       this.scale = 1.0});
@@ -927,15 +932,49 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                       borderRadius: BorderRadius.circular(20 * s),
                       color: const Color(0x22000000),
                     ),
-                    child: Text(
-                      widget.nama.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 56 * s,
-                        fontWeight: FontWeight.w800,
-                        color: AudienceTheme.goldLight,
-                        letterSpacing: 4 * s,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: 1500 * s),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.nama.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 56 * s,
+                              fontWeight: FontWeight.w800,
+                              color: AudienceTheme.goldLight,
+                              letterSpacing: 4 * s,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          // Baris alamat: pembeda bila nama pemenang sama.
+                          // Disembunyikan bila alamat kosong di data.
+                          if (widget.alamat.trim().isNotEmpty) ...[
+                            SizedBox(height: 14 * s),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.location_on,
+                                    color: AudienceTheme.gold, size: 32 * s),
+                                SizedBox(width: 10 * s),
+                                Flexible(
+                                  child: Text(
+                                    widget.alamat.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 30 * s,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                      letterSpacing: 1 * s,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),

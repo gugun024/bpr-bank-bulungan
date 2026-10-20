@@ -10,7 +10,9 @@ class AudienceProtocol {
   static const String startShuffle = 'startShuffle';
   static const String stopShuffle = 'stopShuffle';
 
-  /// args: {coupon: String, nama: String, hadiah: String}
+  /// args: {coupon: String, nama: String, alamat: String, hadiah: String}
+  /// alamat ditampilkan di kartu nama pemenang (pembedaan nama yang sama);
+  /// boleh kosong — baris alamat disembunyikan.
   static const String showWinner = 'showWinner';
 
   /// args: {hadiah: String} — tampilkan hadiah yang sedang diundi
@@ -44,6 +46,7 @@ class AudienceProtocol {
 
   static const String argCoupon = 'coupon';
   static const String argNama = 'nama';
+  static const String argAlamat = 'alamat';
   static const String argHadiah = 'hadiah';
   static const String argMuted = 'muted';
   static const String argRekening = 'rekening';
