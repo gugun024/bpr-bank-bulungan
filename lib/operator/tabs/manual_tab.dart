@@ -32,6 +32,9 @@ class _ManualTabState extends State<ManualTab> {
   // Default mati — penolakan hanya tampil di operator. Disimpan di DB.
   static const _kShowRejected = 'show_rejected_on_audience';
   bool _showRejectedOnAudience = false;
+  // Pilihan hadiah terakhir operator — disimpan per tab agar tidak kereset
+  // saat pindah tab (State tab dibuang dari tree tiap ganti halaman).
+  static const _kSelectedPrize = 'selected_prize_manual';
 
   @override
   void initState() {
@@ -64,20 +67,33 @@ class _ManualTabState extends State<ManualTab> {
     for (final p in prizes) {
       remaining[p.id!] = p.qty - await db.winnerCountForPrize(p.id!);
     }
+    // Pilihan hadiah terakhir operator (per tab) — dipulihkan bila masih ada.
+    final savedId = int.tryParse(await db.getSetting(_kSelectedPrize) ?? '');
     if (!mounted) return;
     setState(() {
       _prizes = prizes;
       _remaining = remaining;
       _couponWidth = total.toString().length.clamp(6, 12);
-      // Pilih otomatis hadiah pertama yang masih ada sisa.
       if (_prize == null ||
           !prizes.any((p) => p.id == _prize!.id) ||
           _left(_prize!) <= 0) {
         _prize = null;
-        for (final p in prizes) {
-          if (_left(p) > 0) {
-            _prize = p;
-            break;
+        // 1) Pulihkan pilihan terakhir operator bila masih tersedia.
+        if (savedId != null) {
+          for (final p in prizes) {
+            if (p.id == savedId && _left(p) > 0) {
+              _prize = p;
+              break;
+            }
+          }
+        }
+        // 2) Kalau tidak ada, pilih hadiah pertama yang masih ada sisa.
+        if (_prize == null) {
+          for (final p in prizes) {
+            if (_left(p) > 0) {
+              _prize = p;
+              break;
+            }
           }
         }
       }
@@ -86,6 +102,9 @@ class _ManualTabState extends State<ManualTab> {
 
   void _onPrizeChanged(Prize? p) {
     setState(() => _prize = p);
+    // Ingat pilihan ini (per tab) agar tidak kereset saat pindah tab.
+    DatabaseHelper.instance
+        .setSetting(_kSelectedPrize, p?.id?.toString() ?? '');
     // Umumkan "hadiah berikutnya" ke layar penonton.
     if (p != null) {
       AudienceChannel.send(

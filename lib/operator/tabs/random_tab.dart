@@ -25,6 +25,9 @@ class _RandomTabState extends State<RandomTab> {
   int _pool = 0;
   int _winners = 0;
   int _couponWidth = 6;
+  // Pilihan hadiah terakhir operator — disimpan per tab agar tidak kereset
+  // saat pindah tab (State tab dibuang dari tree tiap ganti halaman).
+  static const _kSelectedPrize = 'selected_prize_random';
 
   @override
   void initState() {
@@ -43,6 +46,8 @@ class _RandomTabState extends State<RandomTab> {
     for (final p in prizes) {
       remaining[p.id!] = p.qty - await db.winnerCountForPrize(p.id!);
     }
+    // Pilihan hadiah terakhir operator (per tab) — dipulihkan bila masih ada.
+    final savedId = int.tryParse(await db.getSetting(_kSelectedPrize) ?? '');
     if (!mounted) return;
     setState(() {
       _prizes = prizes;
@@ -54,10 +59,22 @@ class _RandomTabState extends State<RandomTab> {
           !prizes.any((p) => p.id == _prize!.id) ||
           _left(_prize!) <= 0) {
         _prize = null;
-        for (final p in prizes) {
-          if (_left(p) > 0) {
-            _prize = p;
-            break;
+        // 1) Pulihkan pilihan terakhir operator bila masih tersedia.
+        if (savedId != null) {
+          for (final p in prizes) {
+            if (p.id == savedId && _left(p) > 0) {
+              _prize = p;
+              break;
+            }
+          }
+        }
+        // 2) Kalau tidak ada, pilih hadiah pertama yang masih ada sisa.
+        if (_prize == null) {
+          for (final p in prizes) {
+            if (_left(p) > 0) {
+              _prize = p;
+              break;
+            }
           }
         }
       }
@@ -66,6 +83,9 @@ class _RandomTabState extends State<RandomTab> {
 
   void _onPrizeChanged(Prize? p) {
     setState(() => _prize = p);
+    // Ingat pilihan ini (per tab) agar tidak kereset saat pindah tab.
+    DatabaseHelper.instance
+        .setSetting(_kSelectedPrize, p?.id?.toString() ?? '');
     if (p != null) {
       AudienceChannel.send(
           AudienceProtocol.showPrize, {AudienceProtocol.argHadiah: p.name});
