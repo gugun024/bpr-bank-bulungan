@@ -25,6 +25,7 @@ class _OperatorAppState extends State<OperatorApp> {
   bool _audienceOpen = false;
   bool _audienceMuted = false;
   bool _openingAudience = false; // cegah klik ganda -> window dobel
+  bool _audioErrorShown = false; // SnackBar error audio cukup sekali
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
@@ -55,8 +56,34 @@ class _OperatorAppState extends State<OperatorApp> {
         }
       }
     });
+    // Laporkan error audio ke layar (sekali saja) — kegagalan audio
+    // tidak boleh hilang senyap seperti sebelumnya.
+    Sounds.onError = (source, error) {
+      if (!mounted || _audioErrorShown) return;
+      _audioErrorShown = true;
+      _messengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text('Error audio ($source): $error'),
+          duration: const Duration(seconds: 12),
+        ),
+      );
+    };
     // Pemanasan audio di engine operator (suara diputar dari sini).
-    Sounds.warmUp();
+    _initAudio();
+  }
+
+  /// Pemanasan audio + tampilkan hasilnya bila memakai jalur cadangan
+  /// atau gagal total.
+  Future<void> _initAudio() async {
+    final msg = await Sounds.warmUp();
+    if (msg == null || !mounted) return;
+    _messengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content:
+            Text(Sounds.audioBroken ? 'Audio TIDAK jalan: $msg' : msg),
+        duration: const Duration(seconds: 12),
+      ),
+    );
   }
 
   Future<void> _initWindow() async {
@@ -128,13 +155,17 @@ class _OperatorAppState extends State<OperatorApp> {
   }
 
   /// Tes putar fanfare dari window operator — buat memastikan jalur
-  /// audio di PC ini sehat.
-  void _testSound() {
-    Sounds.fanfare();
+  /// audio di PC ini sehat. Hasilnya menyebut jalur yang aktif.
+  Future<void> _testSound() async {
+    await Sounds.fanfare();
+    if (!mounted) return;
     _messengerKey.currentState?.showSnackBar(
-      const SnackBar(
-          content:
-              Text('Tes suara: fanfare diputar dari window operator.')),
+      SnackBar(
+        content: Text(Sounds.audioBroken
+            ? 'Tes suara GAGAL — ${Sounds.initMessage ?? 'tidak ada jalur audio yang jalan'}'
+            : 'Tes suara: fanfare diputar via jalur ${Sounds.backendLabel}.'),
+        duration: const Duration(seconds: 6),
+      ),
     );
   }
 

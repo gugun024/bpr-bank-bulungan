@@ -21,6 +21,7 @@ dependencies:
   intl: ^0.20.2
   path: ^1.9.1 # dipakai langsung oleh lib/core/database.dart & history_tab.dart
   audioplayers: ^6.7.1
+  ffi: ^2.1.4 # FFI untuk jalur cadangan audio Windows (winmm PlaySound)
   pdf: ^3.11.3 # export kupon ke PDF siap cetak
 
 dev_dependencies:

@@ -11,6 +11,7 @@ import 'package:undian_bank/core/draw_service.dart';
 import 'package:undian_bank/core/import_service.dart';
 import 'package:undian_bank/core/models.dart';
 import 'package:undian_bank/operator/tabs/data_tab.dart';
+import 'package:undian_bank/operator/tabs/history_tab.dart';
 
 void main() {
   setUpAll(() {
@@ -435,6 +436,52 @@ void main() {
     final tableW = tester.getSize(find.byType(DataTable)).width;
     // Tabel memenuhi lebar area kartu: 1200 dikurangi scrollbar vertikal.
     expect(tableW, greaterThanOrEqualTo(1180));
+  });
+
+  testWidgets('Riwayat: tabel selebar kartu', (tester) async {
+    final db = DatabaseHelper.instance;
+    // Surface lebih tinggi dari default 600px (jendela operator asli
+    // minimal 720px) agar header tab tidak overflow vertikal.
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    // Operasi DB asli harus di luar zona FakeAsync testWidgets.
+    await tester.runAsync(() async {
+      await db.replaceAllAccounts([
+        const Account(
+          rekening: '01.13.000001.00',
+          rekeningLama: '',
+          nama: 'Pemenang Uji',
+          alamat: '',
+          saldo: 100000,
+          kuponCount: 1,
+          couponStart: 1,
+          couponEnd: 1,
+        ),
+      ]);
+      final prizeId = await db
+          .insertPrize(const Prize(name: 'Hadiah Uji', urutan: 1, qty: 1));
+      final acc = (await db.findByCoupon(1))!;
+      await DrawService().recordWinner(
+          couponNo: 1, accountId: acc.id!, prizeId: prizeId, mode: 'manual');
+    });
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: SizedBox(width: 1200, child: HistoryTab())),
+      ),
+    );
+    // Beri waktu _load() selesai (DB asli), lalu pump sekali.
+    await tester.runAsync(() async {
+      await Future.delayed(const Duration(milliseconds: 500));
+    });
+    await tester.pump();
+    final tableW = tester.getSize(find.byType(DataTable)).width;
+    // Konsisten dengan Data Nasabah: tabel memenuhi lebar area kartu.
+    expect(tableW, greaterThanOrEqualTo(1180));
+    // Bersihkan agar test lain tidak terganggu.
+    await tester.runAsync(() async {
+      await db.clearAllWinners();
+    });
   });
 
   group('sistem hapus + bulk', () {

@@ -212,9 +212,16 @@ class _HistoryTabState extends State<HistoryTab> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: SingleChildScrollView(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) =>
+                            SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          // Tabel minimal selebar kartu (konsisten dengan
+                          // Data Nasabah); isi lebih lebar -> scroll.
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                                minWidth: constraints.maxWidth),
+                            child: DataTable(
                           headingRowColor:
                               WidgetStateProperty.all(OpTheme.navySoft),
                           headingTextStyle: const TextStyle(
@@ -236,6 +243,8 @@ class _HistoryTabState extends State<HistoryTab> {
                             for (var i = 0; i < _winners.length; i++)
                               _row(i + 1, _winners[i]),
                           ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
