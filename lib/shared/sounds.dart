@@ -121,7 +121,7 @@ class Sounds {
     final p = AudioPlayer();
     try {
       await p.setVolume(0);
-      await p.play(AssetSource('assets/sounds/fanfare.wav'));
+      await p.play(AssetSource('sounds/fanfare.wav'));
       await p.stop();
       return null;
     } catch (e) {
@@ -134,8 +134,12 @@ class Sounds {
   static Future<void> _ensureTickPool() async {
     if (_tickPool != null || _poolFailed) return;
     try {
+      // PENTING: path audioplayers TANPA awalan 'assets/' — AudioCache
+      // menambahkannya sendiri. 'assets/sounds/...' menjadi
+      // 'assets/assets/sounds/...' dan file tidak ditemukan (bug lama
+      // yang membuat semua suara bisu sejak awal).
       _tickPool = await AudioPool.createFromAsset(
-        path: 'assets/sounds/tick.wav',
+        path: 'sounds/tick.wav',
         maxPlayers: 4,
         // mediaPlayer: kompatibel semua platform (lowLatency = Android saja).
         playerMode: PlayerMode.mediaPlayer,
@@ -190,7 +194,7 @@ class Sounds {
       return;
     }
     try {
-      await _fanfarePlayer.play(AssetSource('assets/sounds/fanfare.wav'));
+      await _fanfarePlayer.play(AssetSource('sounds/fanfare.wav'));
     } catch (e) {
       debugPrint('[Sounds] fanfare gagal: $e');
       onError?.call('fanfare', e);
