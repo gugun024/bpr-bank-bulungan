@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../shared/protocol.dart';
+import '../shared/sounds.dart';
 import '../shared/theme.dart';
 import 'tabs/data_tab.dart';
 import 'tabs/history_tab.dart';
@@ -24,6 +25,7 @@ class _OperatorAppState extends State<OperatorApp> {
   bool _audienceOpen = false;
   bool _audienceMuted = false;
   bool _openingAudience = false; // cegah klik ganda -> window dobel
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
@@ -31,7 +33,7 @@ class _OperatorAppState extends State<OperatorApp> {
     _initWindow();
     // Terima notifikasi dari window penonton (mis. disembunyikan via Alt+F4)
     // agar status "Layar Penonton" di operator selalu akurat.
-    AudienceChannel.initReceiver((method) async {
+    AudienceChannel.initReceiver((method, args) async {
       if (method == AudienceProtocol.audienceHidden && mounted) {
         setState(() {
           _audienceOpen = false;
@@ -39,7 +41,22 @@ class _OperatorAppState extends State<OperatorApp> {
           AudienceChannel.enabled = false;
         });
       }
+      if (method == AudienceProtocol.soundReport) {
+        final detail = (args?[AudienceProtocol.argDetail] ?? '').toString();
+        if (detail.isNotEmpty && detail != 'ok') {
+          _messengerKey.currentState?.showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Diagnostik audio penonton: $detail\n'
+                  '(Suara kini diputar dari window operator.)'),
+              duration: const Duration(seconds: 12),
+            ),
+          );
+        }
+      }
     });
+    // Pemanasan audio di engine operator (suara diputar dari sini).
+    Sounds.warmUp();
   }
 
   Future<void> _initWindow() async {
@@ -100,13 +117,25 @@ class _OperatorAppState extends State<OperatorApp> {
     }
   }
 
-  /// Bisukan / nyalakan efek suara layar penonton (mis. saat MC berbicara).
+  /// Bisukan / nyalakan efek suara undian (diputar dari window operator).
   void _toggleAudienceMute() {
     final muted = !_audienceMuted;
     if (mounted) setState(() => _audienceMuted = muted);
+    Sounds.setMuted(muted);
     AudienceChannel.send(AudienceProtocol.audienceMute, {
       AudienceProtocol.argMuted: muted,
     });
+  }
+
+  /// Tes putar fanfare dari window operator — buat memastikan jalur
+  /// audio di PC ini sehat.
+  void _testSound() {
+    Sounds.fanfare();
+    _messengerKey.currentState?.showSnackBar(
+      const SnackBar(
+          content:
+              Text('Tes suara: fanfare diputar dari window operator.')),
+    );
   }
 
   @override
@@ -119,6 +148,7 @@ class _OperatorAppState extends State<OperatorApp> {
       const _Tab('Riwayat', Icons.history, HistoryTab()),
     ];
     return MaterialApp(
+      scaffoldMessengerKey: _messengerKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: OpTheme.navy),
@@ -181,8 +211,8 @@ class _OperatorAppState extends State<OperatorApp> {
                         const SizedBox(width: 4),
                         IconButton(
                           tooltip: _audienceMuted
-                              ? 'Nyalakan suara layar penonton'
-                              : 'Bisukan suara layar penonton',
+                              ? 'Nyalakan suara undian'
+                              : 'Bisukan suara undian',
                           icon: Icon(
                               _audienceMuted
                                   ? Icons.volume_off
@@ -190,6 +220,13 @@ class _OperatorAppState extends State<OperatorApp> {
                               size: 18),
                           color: OpTheme.success,
                           onPressed: _toggleAudienceMute,
+                        ),
+                        IconButton(
+                          tooltip: 'Tes suara (fanfare)',
+                          icon:
+                              const Icon(Icons.music_note_outlined, size: 18),
+                          color: OpTheme.success,
+                          onPressed: _testSound,
                         ),
                         IconButton(
                           tooltip: 'Reset ke splash',

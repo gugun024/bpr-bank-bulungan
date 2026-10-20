@@ -37,12 +37,18 @@ class AudienceProtocol {
   /// args: {muted: bool}
   static const String audienceMute = 'audienceMute';
 
+  /// audience → operator: laporan hasil self-test audio di window
+  /// penonton. args: {detail: String} — 'ok' bila jalur audio sehat,
+  /// selain itu teks error asli dari platform.
+  static const String soundReport = 'soundReport';
+
   static const String argCoupon = 'coupon';
   static const String argNama = 'nama';
   static const String argHadiah = 'hadiah';
   static const String argMuted = 'muted';
   static const String argRekening = 'rekening';
   static const String argWaktu = 'waktu';
+  static const String argDetail = 'detail';
 }
 
 /// Pengirim perintah ke window penonton (dipakai window operator).
@@ -60,12 +66,14 @@ class AudienceChannel {
   static bool enabled = false;
 
   /// Daftarkan penerima pesan dari window penonton. Dipanggil sekali
-  /// saat aplikasi operator mulai.
+  /// saat aplikasi operator mulai. Callback menerima nama method +
+  /// arguments-nya (Map atau null).
   static Future<void> initReceiver(
-      Future<void> Function(String method) onMessage) async {
+      Future<void> Function(String method, Map? args) onMessage) async {
     try {
       await _channel.setMethodCallHandler((call) async {
-        await onMessage(call.method);
+        final args = (call.arguments as Map?)?.cast<String, Object?>();
+        await onMessage(call.method, args);
       });
     } catch (_) {
       // Gagal registrasi — status penonton tetap ditracking manual.

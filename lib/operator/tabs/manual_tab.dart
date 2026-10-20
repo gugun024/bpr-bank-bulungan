@@ -6,6 +6,7 @@ import '../../core/database.dart';
 import '../../core/draw_service.dart';
 import '../../core/models.dart';
 import '../../shared/protocol.dart';
+import '../../shared/sounds.dart';
 import '../../shared/theme.dart';
 import '../widgets/ui_kit.dart';
 
@@ -193,6 +194,9 @@ class _ManualTabState extends State<ManualTab> {
         AudienceProtocol.argNama: found.account.nama,
         AudienceProtocol.argHadiah: prize.name,
       });
+      // Suara reveal (tick melambat 2,6 dtk + fanfare) diputar dari
+      // window operator — sinkron dengan animasi slot di penonton.
+      Sounds.playReveal();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -228,6 +232,7 @@ class _ManualTabState extends State<ManualTab> {
 
   @override
   void dispose() {
+    Sounds.stopReveal();
     _couponCtrl.dispose();
     super.dispose();
   }

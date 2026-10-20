@@ -60,7 +60,22 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
     _goFullscreen();
     _channel.setMethodCallHandler(_onMethod);
     windowManager.addListener(this);
-    Sounds.warmUp(); // pemanasan audio agar tick/fanfare siap bunyi
+    // Suara TIDAK lagi diputar dari window ini (audioplayers terbukti
+    // bisu di sub-window). Pemutaran pindah ke window operator.
+    // Di sini cukup self-test sekali + laporkan hasilnya ke operator
+    // agar penyebab bisunya terlihat (diagnostik).
+    _runSoundSelfTest();
+  }
+
+  Future<void> _runSoundSelfTest() async {
+    final err = await Sounds.selfTest();
+    try {
+      await _channel.invokeMethod(AudienceProtocol.soundReport, {
+        AudienceProtocol.argDetail: err ?? 'ok',
+      });
+    } catch (_) {
+      // Operator belum siap menerima — abaikan.
+    }
   }
 
   Future<void> _goFullscreen() async {
@@ -177,7 +192,8 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         setState(() {
           _rolling = _rand.nextInt(1000000).toString().padLeft(6, '0');
         });
-        Sounds.tick(); // bunyi kocokan tiap frame
+        // Tick diputar oleh window operator (lihat Sounds.playReveal /
+        // startShuffleTicks) — bukan dari sub-window ini.
       }
     });
   }
@@ -770,20 +786,13 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
     _roll.addStatusListener((s) {
       if (s == AnimationStatus.completed && mounted) {
         setState(() => _locked = true);
-        Sounds.fanfare(); // nomor dikunci → fanfare!
+        // Fanfare diputar oleh window operator (sinkron via playReveal).
         _reveal.forward();
       }
     });
-    // Tick tiap frame roll — karena kurva easeOutQuart, tick otomatis
-    // melambat mengikuti animasi slot.
-    var lastTick = -1;
-    _roll.addListener(() {
-      final idx = (_roll.value * 44).floor();
-      if (idx != lastTick) {
-        lastTick = idx;
-        Sounds.tick();
-      }
-    });
+    // Catatan: tick slot TIDAK diputar dari window ini — window operator
+    // memutarnya dengan pola yang sama (Sounds.playReveal: easeOutQuart
+    // 2,6 dtk, 44 frame, lalu fanfare).
     _pieces = List.generate(90, (_) => _Confetti.random(_rand));
     _roll.forward();
   }
