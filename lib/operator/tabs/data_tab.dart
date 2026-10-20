@@ -325,9 +325,16 @@ class _DataTabState extends State<DataTab> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: SingleChildScrollView(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) =>
+                            SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          // Tabel minimal selebar kartu; kalau isi lebih lebar,
+                          // scroll horizontal seperti biasa.
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                                minWidth: constraints.maxWidth),
+                            child: DataTable(
                           onSelectAll: (v) =>
                               _toggleSelectPage(v == true),
                           headingRowColor:
@@ -354,6 +361,8 @@ class _DataTabState extends State<DataTab> {
                               _row(_page * _pageSize + i + 1, _rows[i],
                                   couponWidth),
                           ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
