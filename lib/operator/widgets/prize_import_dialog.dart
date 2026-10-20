@@ -246,12 +246,29 @@ class _PrizeImportDialogState extends State<PrizeImportDialog> {
                           const SizedBox(width: 12),
                           if (_fileName != null)
                             Expanded(
-                              child: Text(_fileName!,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: OpTheme.navy,
-                                      fontSize: 13)),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: OpTheme.navySoft,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.table_chart_outlined,
+                                        color: OpTheme.navy, size: 18),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(_fileName!,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              color: OpTheme.navy,
+                                              fontSize: 13)),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                         ],
                       ),
@@ -419,6 +436,10 @@ class _PrizeImportDialogState extends State<PrizeImportDialog> {
     return SizedBox(
       width: 220,
       child: DropdownButtonFormField<int>(
+        // Key unik per field + nilai: memaksa dropdown dibangun ulang
+        // tiap autoMap/pilihan berubah (initialValue saja tidak cukup —
+        // pilihan file ke-2 tidak akan tampil tanpa key ini).
+        key: ValueKey('$label:$current'),
         initialValue: current >= 0 ? current : -1,
         decoration: OpTheme.input(label),
         items: [

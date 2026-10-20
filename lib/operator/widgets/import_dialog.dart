@@ -346,6 +346,10 @@ class _ImportDialogState extends State<ImportDialog> {
     return SizedBox(
       width: 220,
       child: DropdownButtonFormField<int>(
+        // Key unik per field + nilai: memaksa dropdown dibangun ulang
+        // tiap autoMap/pilihan berubah (initialValue saja tidak cukup —
+        // pilihan file ke-2 tidak akan tampil tanpa key ini).
+        key: ValueKey('$label:$current'),
         initialValue: current >= 0 ? current : -1,
         decoration: OpTheme.input(label),
         items: [
