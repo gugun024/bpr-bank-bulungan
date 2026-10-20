@@ -135,6 +135,47 @@ class DatabaseHelper {
     return (r.first['c'] as int?) ?? 0;
   }
 
+  /// Hapus rekening terpilih (satuan/bulk) + hitung ulang rentang kupon
+  /// global berurutan (aturan sama seperti import: mulai dari 1).
+  /// Melempar StateError bila ada rekening yang sudah menang — riwayat
+  /// harus dibatalkan dulu agar tidak rusak.
+  Future<void> deleteAccounts(List<int> ids) async {
+    if (ids.isEmpty) return;
+    final d = await db;
+    await d.transaction((txn) async {
+      final ph = ids.map((_) => '?').join(',');
+      final won = await txn.rawQuery(
+        'SELECT COUNT(*) AS c FROM accounts WHERE id IN ($ph) AND has_won = 1',
+        ids,
+      );
+      if (((won.first['c'] as int?) ?? 0) > 0) {
+        throw StateError(
+            'Ada rekening yang sudah menang — batalkan undiannya dulu di tab Riwayat.');
+      }
+      await txn.delete('accounts', where: 'id IN ($ph)', whereArgs: ids);
+      final rows = await txn.query(
+        'accounts',
+        columns: ['id', 'kupon_count'],
+        orderBy: 'coupon_start ASC',
+      );
+      var next = 1;
+      final batch = txn.batch();
+      for (final r in rows) {
+        final count = (r['kupon_count'] as int?) ?? 0;
+        final start = count > 0 ? next : 0;
+        final end = count > 0 ? next + count - 1 : 0;
+        next += count;
+        batch.update(
+          'accounts',
+          {'coupon_start': start, 'coupon_end': end},
+          where: 'id = ?',
+          whereArgs: [r['id']],
+        );
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
   /// Jumlah rekening dengan filter pencarian (nama / no. rekening).
   Future<int> countAccountsFiltered(String query) async {
     final d = await db;
@@ -231,7 +272,32 @@ class DatabaseHelper {
 
   Future<void> deletePrize(int id) async {
     final d = await db;
-    await d.delete('prizes', where: 'id = ?', whereArgs: [id]);
+    await d.transaction((txn) async {
+      final r = await txn.rawQuery(
+          'SELECT COUNT(*) AS c FROM winners WHERE prize_id = ?', [id]);
+      if (((r.first['c'] as int?) ?? 0) > 0) {
+        throw StateError(
+            'Hadiah sudah pernah diundi — batalkan riwayatnya dulu di tab Riwayat.');
+      }
+      await txn.delete('prizes', where: 'id = ?', whereArgs: [id]);
+    });
+  }
+
+  /// Hapus beberapa hadiah sekaligus (bulk). Guard sama seperti satuan:
+  /// hadiah yang sudah pernah diundi tidak boleh dihapus.
+  Future<void> deletePrizes(List<int> ids) async {
+    if (ids.isEmpty) return;
+    final d = await db;
+    await d.transaction((txn) async {
+      final ph = ids.map((_) => '?').join(',');
+      final r = await txn.rawQuery(
+          'SELECT COUNT(*) AS c FROM winners WHERE prize_id IN ($ph)', ids);
+      if (((r.first['c'] as int?) ?? 0) > 0) {
+        throw StateError(
+            'Ada hadiah yang sudah pernah diundi — batalkan riwayatnya dulu di tab Riwayat.');
+      }
+      await txn.delete('prizes', where: 'id IN ($ph)', whereArgs: ids);
+    });
   }
 
   Future<int> winnerCountForPrize(int prizeId) async {
@@ -307,6 +373,16 @@ class DatabaseHelper {
       await txn.delete('winners', where: 'id = ?', whereArgs: [w.id]);
       await txn.update('accounts', {'has_won': 0},
           where: 'id = ?', whereArgs: [w.accountId]);
+    });
+  }
+
+  /// Hapus SEMUA riwayat pemenang + kembalikan flag menang semua rekening.
+  /// Dipakai tombol "Reset Undian" di tab Riwayat.
+  Future<void> clearAllWinners() async {
+    final d = await db;
+    await d.transaction((txn) async {
+      await txn.delete('winners');
+      await txn.update('accounts', {'has_won': 0});
     });
   }
 

@@ -30,6 +30,7 @@ class _DataTabState extends State<DataTab> {
   int _totalCoupons = 0;
   String _query = '';
   bool _busy = false;
+  final Set<int> _selected = {}; // id rekening terpilih (untuk hapus bulk)
 
   @override
   void initState() {
@@ -90,6 +91,7 @@ class _DataTabState extends State<DataTab> {
       setState(() {
         _query = '';
         _page = 0;
+        _selected.clear();
       });
       await _load();
       if (mounted) {
@@ -97,6 +99,107 @@ class _DataTabState extends State<DataTab> {
           const SnackBar(content: Text('Import selesai, tabel diperbarui.')),
         );
       }
+    }
+  }
+
+  void _toggleSelect(int id, bool v) {
+    setState(() {
+      if (v) {
+        _selected.add(id);
+      } else {
+        _selected.remove(id);
+      }
+    });
+  }
+
+  void _toggleSelectPage(bool v) {
+    setState(() {
+      for (final a in _rows) {
+        if (v) {
+          _selected.add(a.id!);
+        } else {
+          _selected.remove(a.id);
+        }
+      }
+    });
+  }
+
+  /// Hapus 1 rekening (konfirmasi). Nomor kupon sisanya dihitung ulang.
+  Future<void> _deleteOne(Account a) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus rekening?'),
+        content: Text(
+            '"${a.nama}" (${a.rekening}) akan dihapus.\n\n'
+            'Nomor kupon rekening lain akan DIHITUNG ULANG berurutan — '
+            'kupon kertas yang sudah tercetak TIDAK akan cocok lagi.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Hapus')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _runDelete({a.id!});
+  }
+
+  /// Hapus rekening terpilih (bulk).
+  Future<void> _deleteSelected() async {
+    if (_selected.isEmpty) return;
+    final n = _selected.length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus rekening terpilih?'),
+        content: Text(
+            '$n rekening akan dihapus.\n\n'
+            'Nomor kupon rekening lain akan DIHITUNG ULANG berurutan — '
+            'kupon kertas yang sudah tercetak TIDAK akan cocok lagi.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Hapus $n')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _runDelete(Set.of(_selected));
+  }
+
+  Future<void> _runDelete(Set<int> ids) async {
+    setState(() => _busy = true);
+    try {
+      await DatabaseHelper.instance.deleteAccounts(ids.toList());
+      if (!mounted) return;
+      setState(() => _selected.clear());
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${ids.length} rekening dihapus.')),
+        );
+      }
+    } on StateError catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: OpTheme.danger),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menghapus: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -168,6 +271,41 @@ class _DataTabState extends State<DataTab> {
           ],
         ),
         const SizedBox(height: 16),
+        if (_selected.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: OpTheme.navySoft,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_box, color: OpTheme.navy, size: 20),
+                const SizedBox(width: 10),
+                Text('${_selected.length} rekening terpilih',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700, color: OpTheme.navy)),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => setState(() => _selected.clear()),
+                  child: const Text('Batal pilih'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: _busy ? null : _deleteSelected,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: OpTheme.danger,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                  ),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: Text('Hapus ${_selected.length}'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         if (_busy) const LinearProgressIndicator(),
         Expanded(
           child: _total == 0 && !_busy
@@ -190,6 +328,8 @@ class _DataTabState extends State<DataTab> {
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: DataTable(
+                          onSelectAll: (v) =>
+                              _toggleSelectPage(v == true),
                           headingRowColor:
                               WidgetStateProperty.all(OpTheme.navySoft),
                           headingTextStyle: const TextStyle(
@@ -207,6 +347,7 @@ class _DataTabState extends State<DataTab> {
                             DataColumn(label: Text('Kupon'), numeric: true),
                             DataColumn(label: Text('Rentang Kupon')),
                             DataColumn(label: Text('Status')),
+                            DataColumn(label: Text('Aksi')),
                           ],
                           rows: [
                             for (var i = 0; i < _rows.length; i++)
@@ -286,24 +427,34 @@ class _DataTabState extends State<DataTab> {
     final range = a.kuponCount > 0
         ? '${Account.formatCoupon(a.couponStart, couponWidth)}–${Account.formatCoupon(a.couponEnd, couponWidth)}'
         : '—';
-    return DataRow(cells: [
-      DataCell(Text('$no', style: const TextStyle(color: OpTheme.textMuted))),
-      DataCell(Text(a.rekening)),
-      DataCell(
-          Text(a.nama, style: const TextStyle(fontWeight: FontWeight.w700))),
-      DataCell(Text(_rp(a.saldo),
-          style:
-              const TextStyle(fontFeatures: [FontFeature.tabularFigures()]))),
-      DataCell(Text('${a.kuponCount}',
-          style: const TextStyle(fontWeight: FontWeight.w700))),
-      DataCell(Text(range,
-          style: const TextStyle(
-              fontFeatures: [FontFeature.tabularFigures()],
-              color: OpTheme.navy))),
-      DataCell(a.hasWon
-          ? const StatusBadge('Menang',
-              fg: OpTheme.goldDark, bg: Color(0xFFFFF3C4))
-          : const Text('—', style: TextStyle(color: OpTheme.textMuted))),
-    ]);
+    return DataRow(
+      selected: _selected.contains(a.id),
+      onSelectChanged: (v) => _toggleSelect(a.id!, v == true),
+      cells: [
+        DataCell(Text('$no', style: const TextStyle(color: OpTheme.textMuted))),
+        DataCell(Text(a.rekening)),
+        DataCell(
+            Text(a.nama, style: const TextStyle(fontWeight: FontWeight.w700))),
+        DataCell(Text(_rp(a.saldo),
+            style:
+                const TextStyle(fontFeatures: [FontFeature.tabularFigures()]))),
+        DataCell(Text('${a.kuponCount}',
+            style: const TextStyle(fontWeight: FontWeight.w700))),
+        DataCell(Text(range,
+            style: const TextStyle(
+                fontFeatures: [FontFeature.tabularFigures()],
+                color: OpTheme.navy))),
+        DataCell(a.hasWon
+            ? const StatusBadge('Menang',
+                fg: OpTheme.goldDark, bg: Color(0xFFFFF3C4))
+            : const Text('—', style: TextStyle(color: OpTheme.textMuted))),
+        DataCell(IconButton(
+          icon: const Icon(Icons.delete_outline,
+              size: 20, color: OpTheme.danger),
+          tooltip: 'Hapus rekening',
+          onPressed: _busy ? null : () => _deleteOne(a),
+        )),
+      ],
+    );
   }
 }

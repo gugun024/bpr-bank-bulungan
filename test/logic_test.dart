@@ -403,4 +403,119 @@ void main() {
     expect(CouponExportService.couponWidth(1500000), 7);
     expect(CouponExportService.couponWidth(5), 6);
   });
+
+  group('sistem hapus + bulk', () {
+    Account acc(String rek, String nama, int kupon, int start, int end) =>
+        Account(
+          rekening: rek,
+          rekeningLama: '',
+          nama: nama,
+          alamat: '',
+          saldo: kupon * 100000,
+          kuponCount: kupon,
+          couponStart: start,
+          couponEnd: end,
+        );
+
+    Future<List<int>> seedAccounts() async {
+      final db = DatabaseHelper.instance;
+      await db.replaceAllAccounts([
+        acc('1', 'A', 2, 1, 2), // kupon 1-2
+        acc('2', 'B', 1, 3, 3), // kupon 3
+        acc('3', 'C', 3, 4, 6), // kupon 4-6
+      ]);
+      final rows =
+          await db.getAccountsPage(limit: 100, offset: 0, query: '');
+      return rows.map((a) => a.id!).toList();
+    }
+
+    test('deleteAccounts: hapus + hitung ulang rentang kupon', () async {
+      final db = DatabaseHelper.instance;
+      final ids = await seedAccounts();
+      await db.deleteAccounts([ids[1]]); // hapus B (kupon 3)
+      final rows =
+          await db.getAccountsPage(limit: 100, offset: 0, query: '');
+      expect(rows.length, 2);
+      // A tetap 1-2, C bergeser jadi 3-5.
+      expect(rows[0].nama, 'A');
+      expect(rows[0].couponStart, 1);
+      expect(rows[0].couponEnd, 2);
+      expect(rows[1].nama, 'C');
+      expect(rows[1].couponStart, 3);
+      expect(rows[1].couponEnd, 5);
+      expect(await db.totalCoupons(), 5);
+    });
+
+    test('deleteAccounts: tolak bila ada yang sudah menang', () async {
+      final db = DatabaseHelper.instance;
+      final ids = await seedAccounts();
+      await db.markWon(ids[0]);
+      await expectLater(
+          db.deleteAccounts([ids[0], ids[1]]), throwsStateError);
+      // Tidak ada yang terhapus (transaksi rollback).
+      expect(await db.countAccounts(), 3);
+    });
+
+    test('deleteAccounts: daftar kosong = no-op', () async {
+      final db = DatabaseHelper.instance;
+      await seedAccounts();
+      await db.deleteAccounts([]);
+      expect(await db.countAccounts(), 3);
+    });
+
+    test('deletePrizes: bulk + guard hadiah yang sudah diundi', () async {
+      final db = DatabaseHelper.instance;
+      final id1 = await db.insertPrize(
+          const Prize(name: 'H1', urutan: 1, qty: 2));
+      final id2 = await db.insertPrize(
+          const Prize(name: 'H2', urutan: 2, qty: 1));
+      final id3 = await db.insertPrize(
+          const Prize(name: 'H3', urutan: 3, qty: 1));
+      // Bulk hapus H1 + H3.
+      await db.deletePrizes([id1, id3]);
+      var prizes = await db.getPrizes();
+      expect(prizes.length, 1);
+      expect(prizes.first.id, id2);
+      // H2 sudah diundi -> tidak bisa dihapus (satuan maupun bulk).
+      final aids = await seedAccounts();
+      await db.insertWinner(Winner(
+        couponNo: 1,
+        accountId: aids[0],
+        prizeId: id2,
+        mode: 'manual',
+        drawnAt: DateTime.now().toIso8601String(),
+      ));
+      await expectLater(db.deletePrize(id2), throwsStateError);
+      await expectLater(db.deletePrizes([id2]), throwsStateError);
+      prizes = await db.getPrizes();
+      expect(prizes.length, 1);
+    });
+
+    test('clearAllWinners: hapus riwayat + kembalikan flag menang',
+        () async {
+      final db = DatabaseHelper.instance;
+      final aids = await seedAccounts();
+      final pid = await db.insertPrize(
+          const Prize(name: 'H', urutan: 1, qty: 5));
+      await db.markWon(aids[0]);
+      await db.insertWinner(Winner(
+        couponNo: 1,
+        accountId: aids[0],
+        prizeId: pid,
+        mode: 'random',
+        drawnAt: DateTime.now().toIso8601String(),
+      ));
+      expect(await db.countWinners(), 1);
+      await db.clearAllWinners();
+      expect(await db.countWinners(), 0);
+      final rows =
+          await db.getAccountsPage(limit: 100, offset: 0, query: '');
+      expect(rows.every((a) => !a.hasWon), true);
+      // Setelah reset, hadiah & rekening boleh dihapus.
+      await db.deletePrize(pid);
+      await db.deleteAccounts([aids[0]]);
+      expect((await db.getPrizes()).isEmpty, true);
+      expect(await db.countAccounts(), 2);
+    });
+  });
 }

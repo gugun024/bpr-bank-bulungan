@@ -17,6 +17,7 @@ class PrizesTab extends StatefulWidget {
 class _PrizesTabState extends State<PrizesTab> {
   List<Prize> _prizes = [];
   final Map<int, int> _wonCount = {};
+  final Set<int> _selected = {}; // id hadiah terpilih (untuk hapus bulk)
 
   @override
   void initState() {
@@ -98,6 +99,16 @@ class _PrizesTabState extends State<PrizesTab> {
     if (ok) await _load();
   }
 
+  void _toggleSelect(int id, bool v) {
+    setState(() {
+      if (v) {
+        _selected.add(id);
+      } else {
+        _selected.remove(id);
+      }
+    });
+  }
+
   Future<void> _delete(Prize p) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -114,9 +125,60 @@ class _PrizesTabState extends State<PrizesTab> {
         ],
       ),
     );
-    if (ok == true) {
-      await DatabaseHelper.instance.deletePrize(p.id!);
+    if (ok != true) return;
+    await _runDelete([p.id!]);
+  }
+
+  /// Hapus hadiah terpilih (bulk).
+  Future<void> _deleteSelected() async {
+    if (_selected.isEmpty) return;
+    final n = _selected.length;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus hadiah terpilih?'),
+        content: Text('$n hadiah akan dihapus dari daftar.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text('Hapus $n')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await _runDelete(_selected.toList());
+  }
+
+  Future<void> _runDelete(List<int> ids) async {
+    try {
+      if (ids.length == 1) {
+        await DatabaseHelper.instance.deletePrize(ids.first);
+      } else {
+        await DatabaseHelper.instance.deletePrizes(ids);
+      }
+      if (!mounted) return;
+      setState(() => _selected.clear());
       await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${ids.length} hadiah dihapus.')),
+        );
+      }
+    } on StateError catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: OpTheme.danger),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menghapus: $e')),
+        );
+      }
     }
   }
 
@@ -155,6 +217,42 @@ class _PrizesTabState extends State<PrizesTab> {
             ],
           ),
           const SizedBox(height: 20),
+          if (_selected.isNotEmpty) ...[
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: OpTheme.navySoft,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_box, color: OpTheme.navy, size: 20),
+                  const SizedBox(width: 10),
+                  Text('${_selected.length} hadiah terpilih',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, color: OpTheme.navy)),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => setState(() => _selected.clear()),
+                    child: const Text('Batal pilih'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _deleteSelected,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: OpTheme.danger,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                    ),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: Text('Hapus ${_selected.length}'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           _prizes.isEmpty
               ? const SizedBox(
                   height: 320,
@@ -182,6 +280,7 @@ class _PrizesTabState extends State<PrizesTab> {
     final left = p.qty - won;
     final done = left <= 0;
     final progress = p.qty > 0 ? (won / p.qty).clamp(0.0, 1.0) : 0.0;
+    final selected = _selected.contains(p.id);
     return SizedBox(
       width: 340,
       child: Container(
@@ -192,6 +291,10 @@ class _PrizesTabState extends State<PrizesTab> {
           children: [
             Row(
               children: [
+                Checkbox(
+                  value: selected,
+                  onChanged: (v) => _toggleSelect(p.id!, v == true),
+                ),
                 Container(
                   width: 46,
                   height: 46,

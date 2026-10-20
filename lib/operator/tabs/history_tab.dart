@@ -61,6 +61,44 @@ class _HistoryTabState extends State<HistoryTab> {
     }
   }
 
+  Future<void> _reset() async {
+    final n = _winners.length;
+    if (n == 0) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset undian?'),
+        content: Text(
+            'SELURUH $n riwayat pemenang akan dihapus permanen dan semua '
+            'rekening kembali bisa diundi.\n\n'
+            'Pastikan daftar pemenang sudah di-export bila masih dibutuhkan.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                  backgroundColor: OpTheme.danger),
+              child: const Text('Ya, reset semua')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busy = true);
+    try {
+      await DatabaseHelper.instance.clearAllWinners();
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Riwayat undian di-reset.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _export() async {
     setState(() => _busy = true);
     try {
@@ -127,6 +165,20 @@ class _HistoryTabState extends State<HistoryTab> {
               ),
               icon: const Icon(Icons.undo, size: 18),
               label: const Text('Batalkan Terakhir'),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: (_winners.isEmpty || _busy) ? null : _reset,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: OpTheme.danger,
+                side: const BorderSide(color: OpTheme.danger),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+              label: const Text('Reset Undian'),
             ),
             const SizedBox(width: 8),
             FilledButton.icon(
