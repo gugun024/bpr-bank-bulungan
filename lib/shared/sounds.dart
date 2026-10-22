@@ -27,12 +27,16 @@ typedef _PlaySoundDart = int Function(
 /// dari operator terdengar identik oleh penonton.
 ///
 /// DUA JALUR PUTAR di Windows:
-/// 1. Utama: plugin audioplayers (mode mediaPlayer).
-/// 2. Cadangan: API Windows langsung (winmm PlaySound via FFI) — tidak
-///    tergantung plugin / Media Foundation sama sekali. Dipakai
-///    OTOMATIS bila jalur utama gagal saat pemanasan atau saat putar,
-///    dan kegagalannya DILAPORKAN lewat [onError] + [initMessage]
-///    agar terlihat di layar operator (bukan hilang senyap).
+/// 1. Utama: plugin audioplayers (mode mediaPlayer) — untuk fanfare.
+/// 2. Cadangan + KHUSUS TICK: API Windows langsung (winmm PlaySound
+///    via FFI) — tidak tergantung plugin / Media Foundation sama
+///    sekali. Dipakai OTOMATIS bila jalur utama gagal, dan tick
+///    SELALU lewat sini di Windows karena AudioPool mediaPlayer
+///    punya latency/antrean (tick masih keluar lama setelah urutan
+///    reveal selesai). PlaySound tanpa antrean: bunyi baru memotong
+///    bunyi sebelumnya, berhenti ya langsung senyap.
+///    Kegagalan jalur utama DILAPORKAN lewat [onError] +
+///    [initMessage] agar terlihat di layar operator.
 ///
 /// Catatan Windows: PlayerMode.lowLatency hanya untuk Android
 /// (SoundPool); di Windows pakai mediaPlayer agar bunyi keluar.
@@ -88,6 +92,9 @@ class Sounds {
   /// Mengembalikan pesan (notice/error) atau null bila jalur utama sehat;
   /// pesan yang sama tersedia di [initMessage].
   static Future<String?> warmUp() async {
+    // Di Windows siapkan selalu file WAV winmm: jalur tick memang
+    // lewat sana (lihat tick()), dan sekalian siap sebagai cadangan.
+    if (Platform.isWindows) await _prepareWinmm();
     final err = await _probePrimary();
     if (err == null) {
       _fallbackActive = false;
@@ -170,6 +177,12 @@ class Sounds {
   /// Tidak perlu di-await oleh pemanggil.
   static Future<void> tick() async {
     if (_muted) return;
+    // Windows: tick selalu via winmm (latency nol, tanpa antrean) —
+    // sinkron persis dengan animasi slot di layar penonton.
+    if (Platform.isWindows && _tickPath != null) {
+      _playWinmm(_tickPath);
+      return;
+    }
     if (_fallbackActive) {
       _playWinmm(_tickPath);
       return;
@@ -215,6 +228,8 @@ class Sounds {
   static void stopShuffleTicks() {
     _shuffleTimer?.cancel();
     _shuffleTimer = null;
+    // Potong tick yang sedang berbunyi agar berhenti seketika.
+    if (Platform.isWindows) _playWinmm(null);
   }
 
   /// Urutan suara reveal pemenang, meniru layar penonton: tick slot
@@ -246,6 +261,8 @@ class Sounds {
   static void stopReveal() {
     _revealTimer?.cancel();
     _revealTimer = null;
+    // Potong tick yang sedang berbunyi agar berhenti seketika.
+    if (Platform.isWindows) _playWinmm(null);
   }
 
   // ---------- Diagnostik ----------
