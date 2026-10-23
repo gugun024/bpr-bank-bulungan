@@ -406,6 +406,67 @@ void main() {
     expect(CouponExportService.couponWidth(5), 6);
   });
 
+  test('export nasabah: filter pencarian, byIds & format CSV', () async {
+    final db = DatabaseHelper.instance;
+    await db.replaceAllAccounts([
+      const Account(
+          rekening: '01.13.000001.00',
+          rekeningLama: 'L-1',
+          nama: 'Budi Santoso',
+          alamat: 'Jl. A',
+          saldo: 500000,
+          kuponCount: 5,
+          couponStart: 1,
+          couponEnd: 5),
+      const Account(
+          rekening: '01.13.000002.00',
+          rekeningLama: '',
+          nama: 'Siti Rahayu',
+          alamat: 'Jl. B',
+          saldo: 0,
+          kuponCount: 0,
+          couponStart: 0,
+          couponEnd: 0),
+      const Account(
+          rekening: '01.13.000003.00',
+          rekeningLama: '',
+          nama: 'Budi Lain',
+          alamat: '',
+          saldo: 200000,
+          kuponCount: 2,
+          couponStart: 6,
+          couponEnd: 7),
+    ]);
+    final all = await db.getAccountsFiltered('');
+    expect(all.length, 3);
+    // Filter pencarian sama seperti tabel (nama/rekening, tak peka kapital).
+    final budi = await db.getAccountsFiltered('budi');
+    expect(budi.map((a) => a.nama), ['Budi Santoso', 'Budi Lain']);
+    Account byName(String n) => all.firstWhere((a) => a.nama == n);
+    // ByIds: hanya yang dipilih, urutan mengikuti nomor kupon.
+    final byIds = await db
+        .getAccountsByIds([byName('Budi Lain').id!, byName('Budi Santoso').id!]);
+    expect(byIds.map((a) => a.nama), ['Budi Santoso', 'Budi Lain']);
+    expect(await db.getAccountsByIds([]), isEmpty);
+
+    final rows =
+        buildAccountsCsvRows([byName('Budi Santoso'), byName('Siti Rahayu')]);
+    expect(rows.first, [
+      'No',
+      'Rekening',
+      'Rek. Lama',
+      'Nama',
+      'Alamat',
+      'Saldo',
+      'Jumlah Kupon',
+      'Rentang Kupon',
+      'Status'
+    ]);
+    expect(rows[1][7], '000001-000005'); // rentang kupon terformat
+    expect(rows[1][8], 'Belum Menang');
+    expect(rows[2][7], '-'); // tanpa kupon
+  });
+
   testWidgets('Data Nasabah: tabel selebar kartu', (tester) async {
     final db = DatabaseHelper.instance;
     // Operasi DB asli harus di luar zona FakeAsync testWidgets.

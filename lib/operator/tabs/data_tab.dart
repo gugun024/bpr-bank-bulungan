@@ -1,6 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:csv/csv.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/database.dart';
 import '../../core/models.dart';
@@ -8,6 +14,40 @@ import '../../shared/theme.dart';
 import '../widgets/coupon_print_dialog.dart';
 import '../widgets/import_dialog.dart';
 import '../widgets/ui_kit.dart';
+
+/// Susun baris CSV export Data Nasabah (header + satu baris per rekening).
+List<List<String>> buildAccountsCsvRows(List<Account> accounts) {
+  final rows = <List<String>>[
+    [
+      'No',
+      'Rekening',
+      'Rek. Lama',
+      'Nama',
+      'Alamat',
+      'Saldo',
+      'Jumlah Kupon',
+      'Rentang Kupon',
+      'Status',
+    ],
+  ];
+  for (var i = 0; i < accounts.length; i++) {
+    final a = accounts[i];
+    rows.add([
+      '${i + 1}',
+      a.rekening,
+      a.rekeningLama,
+      a.nama,
+      a.alamat,
+      '${a.saldo}',
+      '${a.kuponCount}',
+      a.kuponCount > 0
+          ? '${Account.formatCoupon(a.couponStart)}-${Account.formatCoupon(a.couponEnd)}'
+          : '-',
+      a.hasWon ? 'Sudah Menang' : 'Belum Menang',
+    ]);
+  }
+  return rows;
+}
 
 /// Tab Data Nasabah: tabel data hasil import (paginasi + pencarian).
 /// Import file dilakukan lewat modal dialog dari tombol "Import Data".
@@ -174,6 +214,47 @@ class _DataTabState extends State<DataTab> {
     await _runDelete(Set.of(_selected));
   }
 
+  /// Export CSV Data Nasabah. Bila ada rekening yang diceklis, yang
+  /// diexport hanya pilihan itu; bila tidak ada, semua rekening yang
+  /// cocok dengan kata pencarian aktif. Pola simpan sama seperti
+  /// export Riwayat (tulis ke Documents + tawarkan lokasi lain).
+  Future<void> _exportCsv() async {
+    setState(() => _busy = true);
+    try {
+      final db = DatabaseHelper.instance;
+      final accounts = _selected.isNotEmpty
+          ? await db.getAccountsByIds(_selected.toList())
+          : await db.getAccountsFiltered(_query);
+      if (accounts.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tidak ada data untuk diexport.')),
+        );
+        return;
+      }
+      final csv =
+          const ListToCsvConverter().convert(buildAccountsCsvRows(accounts));
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File(p.join(dir.path,
+          'nasabah_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv'));
+      await file.writeAsString(csv);
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Simpan data nasabah',
+        fileName: p.basename(file.path),
+        bytes: await file.readAsBytes(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(savePath != null
+                ? '${accounts.length} rekening tersimpan: $savePath'
+                : '${accounts.length} rekening tersimpan di: ${file.path}')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _runDelete(Set<int> ids) async {
     setState(() => _busy = true);
     try {
@@ -244,6 +325,20 @@ class _DataTabState extends State<DataTab> {
               ),
               icon: const Icon(Icons.print_outlined, size: 18),
               label: const Text('Cetak Kupon'),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton.icon(
+              onPressed: (_busy || _total == 0) ? null : _exportCsv,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 18, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.download, size: 18),
+              label: Text(_selected.isEmpty
+                  ? 'Export CSV'
+                  : 'Export CSV (${_selected.length})'),
             ),
             const SizedBox(width: 8),
             FilledButton.icon(

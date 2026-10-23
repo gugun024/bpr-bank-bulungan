@@ -208,6 +208,26 @@ class DatabaseHelper {
     return r.map(Account.fromMap).toList();
   }
 
+  /// Semua rekening yang cocok dengan pencarian (tanpa paginasi),
+  /// untuk export CSV. Semantik filter sama persis dengan tabel.
+  Future<List<Account>> getAccountsFiltered(String query) =>
+      getAccountsPage(limit: 1 << 30, offset: 0, query: query);
+
+  /// Rekening berdasarkan daftar id (untuk export pilihan/ceklis),
+  /// diurutkan mengikuti nomor kupon.
+  Future<List<Account>> getAccountsByIds(List<int> ids) async {
+    if (ids.isEmpty) return [];
+    final d = await db;
+    final marks = List.filled(ids.length, '?').join(',');
+    final r = await d.query(
+      'accounts',
+      where: 'id IN ($marks)',
+      whereArgs: ids,
+      orderBy: 'coupon_start ASC',
+    );
+    return r.map(Account.fromMap).toList();
+  }
+
   Future<int> totalCoupons() async {
     final d = await db;
     final r = await d.rawQuery(
