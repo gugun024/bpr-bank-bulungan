@@ -15,6 +15,17 @@ import '../shared/theme.dart';
 /// Window penonton: fullscreen di monitor kedua / proyektor.
 /// Dikendalikan penuh dari window operator via WindowMethodChannel.
 ///
+/// Layout mengikuti mockup broadcast navy-emas yang disetujui Gugun
+/// (mockup-layout-broadcast-v3v4.html varian 4; layar pemenang imersif
+/// dari mockup-layout-gabungan.html): header brand + judul + badge
+/// LIVE, tiga kolom (panel hadiah | drum mesin undi | panel info),
+/// dan ticker pemenang terakhir di bawah. Stage pemenang dengan foto
+/// hadiah valid tampil imersif: foto memenuhi layar, panel info kaca
+/// melayang di kanan.
+///
+/// Semua ukuran ditulis untuk kanvas 1920x1080 (mockup 960x540 ×2)
+/// lalu dikali faktor skala responsif [audienceScaleFor].
+///
 /// CATATAN: agar plugin (window_manager) terdaftar di sub-window pada
 /// build Windows, ikuti langkah registrasi plugin di README (edit
 /// windows/runner/flutter_window.cpp sekali saja).
@@ -39,6 +50,23 @@ double audienceScaleFor(Size size) {
 double audienceScale(BuildContext context) =>
     audienceScaleFor(MediaQuery.sizeOf(context));
 
+/// Palet layout broadcast navy-emas (hex persis dari mockup).
+class _Bc {
+  static const Color navy = AudienceTheme.navy800; // #10224D
+  static const Color navyDeep = AudienceTheme.navy900; // #0A1633
+  static const Color deep = Color(0xFF060C1F);
+  static const Color gold = AudienceTheme.gold; // #D4AF37
+  static const Color goldLight = AudienceTheme.goldLight; // #F3D27A
+  static const Color goldDark = AudienceTheme.goldDark; // #9C7C1E
+  static const Color onGold = Color(0xFF3A2E00);
+  static const Color onGoldDim = Color(0xFF7A5E10);
+  static const Color muted = Color(0xFFC6CEDE);
+  static const Color tagline = Color(0xFFD7E7FF);
+  static const Color liveRed = Color(0xFFE53935);
+  static const Color amber = Color(0xFFF59E0B);
+  static const Color amberLight = Color(0xFFFCD34D);
+}
+
 class _AudienceAppState extends State<AudienceApp> with WindowListener {
   _Stage _stage = _Stage.idle;
   String _coupon = '';
@@ -46,8 +74,13 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   String _alamat = '';
   String _gambar = '';
   String _hadiah = '';
+  // Hadiah yang sedang diundi (untuk panel hadiah kiri). Terpisah dari
+  // _hadiah karena showRejected menimpa _hadiah dengan nama hadiah
+  // yang SEBELUMNYA dimenangkan pemilik kupon.
+  String _prize = '';
   String _rejectedRekening = '';
   String _rejectedWaktu = '';
+  List<String> _ticker = [];
   String _rolling = '000000';
   Timer? _rollTimer;
   final _rand = Random();
@@ -118,6 +151,13 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
     } catch (_) {}
   }
 
+  /// Baca argumen ticker (daftar nomor kupon terformat) bila ada.
+  List<String>? _parseTicker(Map args) {
+    final t = args[AudienceProtocol.argTicker];
+    if (t is List) return t.map((e) => e.toString()).toList();
+    return null;
+  }
+
   Future<dynamic> _onMethod(MethodCall call) async {
     switch (call.method) {
       case AudienceProtocol.showIdle:
@@ -131,6 +171,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           final prize = a[AudienceProtocol.argHadiah];
           if (prize is String && prize.isNotEmpty) _hadiah = prize;
           _gambar = (a[AudienceProtocol.argGambar] ?? '').toString();
+          _prize = _hadiah;
         });
         _startRoll();
         break;
@@ -146,6 +187,9 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           _alamat = (args[AudienceProtocol.argAlamat] ?? '').toString();
           _gambar = (args[AudienceProtocol.argGambar] ?? '').toString();
           _hadiah = (args[AudienceProtocol.argHadiah] ?? '').toString();
+          _prize = _hadiah;
+          final t = _parseTicker(args);
+          if (t != null) _ticker = t;
           _stage = _Stage.winner;
         });
         break;
@@ -154,6 +198,9 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         setState(() {
           _hadiah = (args[AudienceProtocol.argHadiah] ?? '').toString();
           _gambar = (args[AudienceProtocol.argGambar] ?? '').toString();
+          _prize = _hadiah;
+          final t = _parseTicker(args);
+          if (t != null) _ticker = t;
           // Hadiah baru = undian sebelumnya selesai → kembali ke idle,
           // kecuali sedang mengocok (mode random).
           if (_stage != _Stage.shuffle) _stage = _Stage.idle;
@@ -221,291 +268,318 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   @override
   Widget build(BuildContext context) {
     final s = audienceScale(context);
+    // Layar pemenang imersif hanya bila hadiah punya foto yang valid.
+    final immersive = _stage == _Stage.winner &&
+        _gambar.isNotEmpty &&
+        File(_gambar).existsSync();
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        body: Container(
-          decoration: AudienceTheme.background(),
-          child: Stack(
-            children: [
-              _GoldGlow(scale: s),
-              Center(
-                child: switch (_stage) {
-                  _Stage.idle => _idleView(s),
-                  _Stage.shuffle => _shuffleView(s),
-                  _Stage.winner => _winnerView(s),
-                  _Stage.rejected => _rejectedView(s),
-                  _Stage.notFound => _notFoundView(s),
-                },
-              ),
-              // Gambar hadiah kiri-kanan (idle / kocokan / pemenang).
-              // Pemenang & kocokan: 420px sejajar kotak kupon (di atas
-              // tengah layar); idle: 360px di tengah (judulnya lebar).
-              if (_gambar.isNotEmpty &&
-                  (_stage == _Stage.idle ||
-                      _stage == _Stage.shuffle ||
-                      _stage == _Stage.winner))
-                _PrizeSideImages(
-                  key: ValueKey('side-$_gambar-$_stage'),
-                  path: _gambar,
-                  scale: s,
-                  size: _stage == _Stage.idle ? 360 : 420,
-                  yFactor: _stage == _Stage.winner ? -0.14 : 0.0,
-                ),
-            ],
-          ),
+        body: Stack(
+          children: [
+            if (immersive)
+              _ImmersiveBackground(path: _gambar)
+            else
+              _BroadcastBackground(scale: s),
+            // Partikel emas melayang hanya di idle (warisan tampilan
+            // lama) — di atas background, di bawah semua panel.
+            if (!immersive && _stage == _Stage.idle) const _Sparkles(),
+            Positioned(
+              top: 40 * s,
+              left: 52 * s,
+              right: 52 * s,
+              child: _Header(scale: s, dark: immersive),
+            ),
+            Positioned(
+              top: 36 * s,
+              right: 44 * s,
+              child: _LiveBadge(scale: s),
+            ),
+            Positioned(
+              left: 52 * s,
+              right: 52 * s,
+              top: 208 * s,
+              bottom: 128 * s,
+              child: _bodyZone(s, immersive),
+            ),
+            Positioned(
+              left: 52 * s,
+              right: 52 * s,
+              bottom: 32 * s,
+              child: _Ticker(scale: s, items: _ticker),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _idleView(double s) => _AnimatedIdleView(hadiah: _hadiah, scale: s);
-
-  Widget _shuffleView(double s) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('MENGUNDI', style: AudienceTheme.title(64 * s)),
-          SizedBox(height: 16 * s),
-          if (_hadiah.isNotEmpty) _prizeChip(s, _hadiah),
-          SizedBox(height: 48 * s),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 72 * s, vertical: 32 * s),
-            decoration: BoxDecoration(
-              border: Border.all(color: AudienceTheme.gold, width: 3),
-              borderRadius: BorderRadius.circular(24 * s),
-              color: const Color(0x22000000),
-            ),
-            child: Text(
-              _rolling,
-              style: TextStyle(
-                fontSize: 120 * s,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 16 * s,
-                color: AudienceTheme.goldLight,
-                fontFeatures: const [FontFeature.tabularFigures()],
+  /// Zona konten tiga kolom di antara header dan ticker.
+  Widget _bodyZone(double s, bool immersive) {
+    final prizePanel = _PrizePanel(scale: s, nama: _prize, gambar: _gambar);
+    switch (_stage) {
+      case _Stage.idle:
+        return Row(
+          children: [
+            prizePanel,
+            SizedBox(width: 36 * s),
+            Expanded(
+              child: _DrumShell(
+                scale: s,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('UNDIAN HADIAH', style: _drumLabelStyle(s)),
+                    SizedBox(height: 12 * s),
+                    Icon(Icons.emoji_events, size: 150 * s, color: _Bc.gold),
+                    SizedBox(height: 12 * s),
+                    Text(
+                      'SEGERA DIMULAI',
+                      style: TextStyle(
+                        fontSize: 40 * s,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
-      );
-
-  Widget _winnerView(double s) => _AnimatedWinnerView(
-        key: ValueKey('winner-$_coupon'),
-        nama: _nama,
-        alamat: _alamat,
-        coupon: _coupon,
-        hadiah: _hadiah,
-        adaGambar: _gambar.isNotEmpty,
-        scale: s,
-      );
-
-  /// Tampilan penolakan: kupon sudah pernah menang.
-  /// Gaya peringatan (amber) — beda dari perayaan pemenang (emas),
-  /// tanpa fanfare & tanpa confetti.
-  Widget _rejectedView(double s) {
-    const amber = Color(0xFFF59E0B);
-    const amberLight = Color(0xFFFCD34D);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 110 * s,
-          height: 110 * s,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: amber, width: 4),
-            color: const Color(0x22F59E0B),
-          ),
-          child: Icon(Icons.block, size: 60 * s, color: amber),
-        ),
-        SizedBox(height: 28 * s),
-        Text(
-          'KUPON SUDAH MENANG',
-          style: AudienceTheme.title(56 * s).copyWith(color: amberLight),
-          textAlign: TextAlign.center,
-        ),
-        SizedBox(height: 24 * s),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 56 * s, vertical: 20 * s),
-          decoration: BoxDecoration(
-            border: Border.all(color: amber, width: 3),
-            borderRadius: BorderRadius.circular(20 * s),
-            color: const Color(0x22000000),
-          ),
-          child: Text(
-            _coupon,
-            style: TextStyle(
-              fontSize: 84 * s,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 12 * s,
-              color: amberLight,
-              fontFeatures: const [FontFeature.tabularFigures()],
+            SizedBox(width: 36 * s),
+            _InfoPanel(
+              scale: s,
+              chipText: 'PENGUNDIAN HADIAH',
+              numText: '— — — — — —',
+              mode: _InfoMode.menunggu,
             ),
-          ),
-        ),
-        SizedBox(height: 24 * s),
-        Text(
-          _nama,
-          style: TextStyle(
-            fontSize: 44 * s,
-            fontWeight: FontWeight.w700,
-            color: AudienceTheme.white,
-            letterSpacing: 2 * s,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        SizedBox(height: 8 * s),
-        if (_rejectedRekening.isNotEmpty)
-          Text(
-            'Rek. $_rejectedRekening',
-            style: TextStyle(fontSize: 26 * s, color: AudienceTheme.white70),
-            textAlign: TextAlign.center,
-          ),
-        if (_hadiah.isNotEmpty)
-          Text(
-            'Sebelumnya memenangkan "$_hadiah"',
-            style: TextStyle(fontSize: 30 * s, color: AudienceTheme.white70),
-            textAlign: TextAlign.center,
-          ),
-        if (_rejectedWaktu.isNotEmpty)
-          Text(
-            'pada $_rejectedWaktu',
-            style: TextStyle(fontSize: 26 * s, color: AudienceTheme.white70),
-            textAlign: TextAlign.center,
-          ),
-        SizedBox(height: 32 * s),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 40 * s, vertical: 14 * s),
-          decoration: BoxDecoration(
-            border: Border.all(color: amber, width: 2),
-            borderRadius: BorderRadius.circular(999),
-            color: const Color(0x22F59E0B),
-          ),
-          child: Text(
-            'SILAKAN UNDI ULANG',
-            style: TextStyle(
-              fontSize: 30 * s,
-              fontWeight: FontWeight.w700,
-              color: amberLight,
-              letterSpacing: 3 * s,
+          ],
+        );
+      case _Stage.shuffle:
+        return Row(
+          children: [
+            prizePanel,
+            SizedBox(width: 36 * s),
+            Expanded(
+              child: _DrumShell(
+                scale: s,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('NOMOR KUPON', style: _drumLabelStyle(s)),
+                    SizedBox(height: 6 * s),
+                    Text(_rolling, style: _drumNumberStyle(s)),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
-      ],
-    );
+            SizedBox(width: 36 * s),
+            _InfoPanel(
+              scale: s,
+              chipText: 'SEDANG DIUNDI',
+              numText: _rolling,
+              mode: _InfoMode.menunggu,
+            ),
+          ],
+        );
+      case _Stage.winner:
+        return _WinnerReveal(
+          key: ValueKey('winner-$_coupon'),
+          coupon: _coupon,
+          nama: _nama,
+          alamat: _alamat,
+          hadiah: _hadiah,
+          immersive: immersive,
+          scale: s,
+          prizePanel: prizePanel,
+        );
+      case _Stage.rejected:
+        return Row(
+          children: [
+            prizePanel,
+            SizedBox(width: 36 * s),
+            Expanded(
+              child: _CenterWarning(
+                scale: s,
+                title: 'KUPON SUDAH PERNAH MENANG',
+                coupon: _coupon,
+              ),
+            ),
+            SizedBox(width: 36 * s),
+            _InfoPanel(
+              scale: s,
+              chipText: 'PENGUNDIAN HADIAH',
+              numText: _coupon,
+              mode: _InfoMode.rejected,
+              nama: _nama,
+              rejectedLine: _rejectedLine(),
+            ),
+          ],
+        );
+      case _Stage.notFound:
+        return Row(
+          children: [
+            prizePanel,
+            SizedBox(width: 36 * s),
+            Expanded(
+              child: _CenterWarning(
+                scale: s,
+                title: 'KUPON TIDAK TERDAFTAR',
+                coupon: _coupon,
+                extra: 'Mohon periksa kembali ke petugas',
+              ),
+            ),
+            SizedBox(width: 36 * s),
+            _InfoPanel(
+              scale: s,
+              chipText: 'PENGUNDIAN HADIAH',
+              numText: _coupon,
+              mode: _InfoMode.notFound,
+            ),
+          ],
+        );
+    }
   }
 
-  /// Tampilan validasi: kupon tidak terdaftar di database.
-  /// Dipakai di undi manual — nomor keluar di depan penonton, operator
-  /// wajib menyampaikan valid/tidaknya. Gaya peringatan (amber),
-  /// tanpa fanfare & tanpa confetti.
-  Widget _notFoundView(double s) {
-    const amber = Color(0xFFF59E0B);
-    const amberLight = Color(0xFFFCD34D);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 110 * s,
-          height: 110 * s,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: amber, width: 4),
-            color: const Color(0x22F59E0B),
-          ),
-          child: Icon(Icons.search_off, size: 60 * s, color: amber),
-        ),
-        SizedBox(height: 28 * s),
-        Text(
-          'KUPON TIDAK TERDAFTAR',
-          style: AudienceTheme.title(56 * s).copyWith(color: amberLight),
-          textAlign: TextAlign.center,
-        ),
-        SizedBox(height: 24 * s),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 56 * s, vertical: 20 * s),
-          decoration: BoxDecoration(
-            border: Border.all(color: amber, width: 3),
-            borderRadius: BorderRadius.circular(20 * s),
-            color: const Color(0x22000000),
-          ),
-          child: Text(
-            _coupon,
-            style: TextStyle(
-              fontSize: 84 * s,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 12 * s,
-              color: amberLight,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ),
-        SizedBox(height: 32 * s),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 40 * s, vertical: 14 * s),
-          decoration: BoxDecoration(
-            border: Border.all(color: amber, width: 2),
-            borderRadius: BorderRadius.circular(999),
-            color: const Color(0x22F59E0B),
-          ),
-          child: Text(
-            'MOHON PERIKSA KEMBALI NOMOR KUPON',
-            style: TextStyle(
-              fontSize: 28 * s,
-              fontWeight: FontWeight.w700,
-              color: amberLight,
-              letterSpacing: 2 * s,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ],
-    );
+  /// Baris info penolakan di panel info: hadiah yang sebelumnya
+  /// dimenangkan pemilik kupon + waktunya.
+  String _rejectedLine() {
+    final parts = <String>[
+      if (_hadiah.isNotEmpty) 'Sudah memenangkan: $_hadiah',
+      if (_rejectedWaktu.isNotEmpty) _rejectedWaktu,
+    ];
+    if (parts.isNotEmpty) return parts.join(' · ');
+    if (_rejectedRekening.isNotEmpty) return 'Rek. $_rejectedRekening';
+    return 'Sudah pernah memenangkan hadiah';
   }
-
-  Widget _prizeChip(double s, String hadiah) => Container(
-        padding: EdgeInsets.symmetric(horizontal: 40 * s, vertical: 16 * s),
-        decoration: BoxDecoration(
-          border: Border.all(color: AudienceTheme.gold, width: 2),
-          borderRadius: BorderRadius.circular(999),
-          color: const Color(0x22D4AF37),
-        ),
-        child: Text(
-          hadiah,
-          style: TextStyle(
-            fontSize: 48 * s,
-            fontWeight: FontWeight.w600,
-            color: AudienceTheme.goldLight,
-            letterSpacing: 2 * s,
-          ),
-        ),
-      );
 }
 
-/// Dekorasi cahaya emas sederhana di latar.
-class _GoldGlow extends StatelessWidget {
+/// Label kecil emas di atas angka drum.
+TextStyle _drumLabelStyle(double s) => TextStyle(
+      fontSize: 21 * s,
+      fontWeight: FontWeight.bold,
+      letterSpacing: 4 * s,
+      color: _Bc.goldLight,
+    );
+
+/// Angka besar di dalam drum.
+TextStyle _drumNumberStyle(double s) => TextStyle(
+      fontSize: 82 * s,
+      fontWeight: FontWeight.w900,
+      letterSpacing: 3 * s,
+      color: Colors.white,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+
+/// Background layar broadcast (v4): gradient navy 150° + glow radial
+/// emas kanan-atas & kiri-bawah + gelombang emas sangat halus.
+class _BroadcastBackground extends StatelessWidget {
   final double scale;
-  const _GoldGlow({this.scale = 1.0});
+  const _BroadcastBackground({required this.scale});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment(-0.5, -0.87),
+              end: Alignment(0.5, 0.87),
+              colors: [_Bc.navy, _Bc.navyDeep, _Bc.deep],
+              stops: [0.0, 0.55, 1.0],
+            ),
+          ),
+        ),
+        Positioned(
+          top: -260 * s,
+          right: -160 * s,
+          child: _Blur(color: const Color(0x29D4AF37), size: 720 * s),
+        ),
+        Positioned(
+          bottom: -260 * s,
+          left: -160 * s,
+          child: _Blur(color: const Color(0x1AD4AF37), size: 720 * s),
+        ),
+        const Positioned.fill(child: CustomPaint(painter: _WavesPainter())),
+      ],
+    );
+  }
+}
+
+/// Background layar pemenang imersif: foto hadiah memenuhi layar +
+/// layer shade navy horizontal (transparan di kiri → pekat di kanan)
+/// persis mockup gabungan.
+class _ImmersiveBackground extends StatelessWidget {
+  final String path;
+  const _ImmersiveBackground({required this.path});
 
   @override
   Widget build(BuildContext context) {
     return Stack(
+      fit: StackFit.expand,
       children: [
-        Positioned(
-          top: -120 * scale,
-          left: -80 * scale,
-          child: _Blur(color: const Color(0x44D4AF37), size: 420 * scale),
+        Image.file(
+          File(path),
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const ColoredBox(color: _Bc.navyDeep),
         ),
-        Positioned(
-          bottom: -140 * scale,
-          right: -60 * scale,
-          child: _Blur(color: const Color(0x332A4A8F), size: 480 * scale),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                Color(0x00000000),
+                Color(0x9E0A1633),
+                Color(0xEB060C1F),
+              ],
+              stops: [0.32, 0.63, 1.0],
+            ),
+          ),
         ),
       ],
     );
   }
 }
 
+/// Gelombang emas halus di atas & bawah layar, meniru path SVG
+/// mockup (kanvas 960x540, diskalakan proporsional ke ukuran layar).
+class _WavesPainter extends CustomPainter {
+  const _WavesPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sx = size.width / 960;
+    final sy = size.height / 540;
+    double x(double v) => v * sx;
+    double y(double v) => v * sy;
+
+    final bottom = Path()
+      ..moveTo(x(0), y(420))
+      ..cubicTo(x(240), y(340), x(420), y(500), x(700), y(420))
+      ..cubicTo(x(820), y(385), x(900), y(420), x(960), y(395))
+      ..lineTo(x(960), y(540))
+      ..lineTo(x(0), y(540))
+      ..close();
+    canvas.drawPath(bottom, Paint()..color = const Color(0x1FD4AF37));
+
+    final top = Path()
+      ..moveTo(x(0), y(90))
+      ..cubicTo(x(200), y(40), x(420), y(130), x(680), y(80))
+      ..cubicTo(x(810), y(55), x(900), y(80), x(960), y(60))
+      ..lineTo(x(960), y(0))
+      ..lineTo(x(0), y(0))
+      ..close();
+    canvas.drawPath(top, Paint()..color = const Color(0x1AD4AF37));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Lingkaran cahaya radial lembut (glow emas di background).
 class _Blur extends StatelessWidget {
   final Color color;
   final double size;
@@ -524,135 +598,121 @@ class _Blur extends StatelessWidget {
   }
 }
 
-/// Layar idle animasi: partikel emas melayang, judul shimmer, glow berdenyut.
-class _AnimatedIdleView extends StatefulWidget {
-  final String hadiah;
+/// Header semua layar: brand bank di kiri, judul acara di kanan.
+/// Pada layar imersif teks brand berwarna GELAP (sisi kiri foto pada
+/// mockup terang) dan judul diberi shadow — persis mockup gabungan.
+class _Header extends StatelessWidget {
   final double scale;
-  const _AnimatedIdleView({required this.hadiah, this.scale = 1.0});
-
-  @override
-  State<_AnimatedIdleView> createState() => _AnimatedIdleViewState();
-}
-
-class _AnimatedIdleViewState extends State<_AnimatedIdleView>
-    with TickerProviderStateMixin {
-  late final AnimationController _shimmer;
-  late final AnimationController _pulse;
-  late final AnimationController _sparks;
-  late final AnimationController _dots;
-  late final List<_Spark> _sparkList;
-  final _rand = Random(42);
-
-  @override
-  void initState() {
-    super.initState();
-    _shimmer =
-        AnimationController(vsync: this, duration: const Duration(seconds: 3))
-          ..repeat();
-    _pulse = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 2600))
-      ..repeat(reverse: true);
-    _sparks =
-        AnimationController(vsync: this, duration: const Duration(seconds: 11))
-          ..repeat();
-    _dots = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat();
-    _sparkList = List.generate(70, (_) => _Spark.random(_rand));
-  }
-
-  @override
-  void dispose() {
-    _shimmer.dispose();
-    _pulse.dispose();
-    _sparks.dispose();
-    _dots.dispose();
-    super.dispose();
-  }
+  final bool dark;
+  const _Header({required this.scale, required this.dark});
 
   @override
   Widget build(BuildContext context) {
-    final s = widget.scale;
-    return Stack(
+    final s = scale;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Glow berdenyut.
-        AnimatedBuilder(
-          animation: _pulse,
-          builder: (context, child) {
-            final sc = 1.0 + _pulse.value * 0.18;
-            return Transform.scale(scale: sc, child: child);
-          },
-          child: _GoldGlow(scale: s),
-        ),
-        // Partikel emas melayang.
-        Positioned.fill(
-          child: CustomPaint(
-            painter: _SparksPainter(_sparks, _sparkList),
+        // Logo placeholder: kotak gradient hijau-biru + huruf "B".
+        // Diganti file logo asli bank bila sudah tersedia.
+        Container(
+          width: 104 * s,
+          height: 104 * s,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF7ED957), Color(0xFF0E9F6E), Color(0xFF1565C0)],
+              stops: [0.0, 0.45, 1.0],
+            ),
+            borderRadius: BorderRadius.circular(24 * s),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0x59000000),
+                blurRadius: 28 * s,
+                offset: Offset(0, 8 * s),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              'B',
+              style: TextStyle(
+                fontSize: 64 * s,
+                fontWeight: FontWeight.w900,
+                fontStyle: FontStyle.italic,
+                color: Colors.white,
+              ),
+            ),
           ),
         ),
-        Center(
+        SizedBox(width: 24 * s),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'PT. BPR',
+              style: TextStyle(
+                fontSize: 24 * s,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2 * s,
+                color: dark ? const Color(0xFF0B3D91) : _Bc.goldLight,
+              ),
+            ),
+            Text(
+              'BANK BULUNGAN',
+              style: TextStyle(
+                fontSize: 48 * s,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5 * s,
+                height: 1.05,
+                color: dark ? const Color(0xFF072A63) : Colors.white,
+              ),
+            ),
+            Text(
+              'Mitra Terpercaya Membangun Masa Depan',
+              style: TextStyle(
+                fontSize: 23 * s,
+                fontStyle: FontStyle.italic,
+                color: dark ? const Color(0xFF31517F) : _Bc.tagline,
+              ),
+            ),
+          ],
+        ),
+        const Spacer(),
+        // Digeser kiri 148 untuk memberi ruang badge LIVE di pojok.
+        Padding(
+          padding: EdgeInsets.only(right: 148 * s),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'PT. BPR BANK BULUNGAN',
+                'PENGUNDIAN HADIAH',
                 style: TextStyle(
-                  fontSize: 30 * s,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 12 * s,
-                  color: AudienceTheme.goldLight,
+                  fontSize: 42 * s,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1 * s,
+                  color: Colors.white,
+                  shadows: dark
+                      ? [
+                          Shadow(
+                            color: const Color(0x66000000),
+                            blurRadius: 10 * s,
+                            offset: Offset(0, 2 * s),
+                          ),
+                        ]
+                      : null,
                 ),
               ),
-              SizedBox(height: 16 * s),
-              Container(
-                width: 220 * s,
-                height: 2,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: [
-                    Color(0x00000000),
-                    AudienceTheme.gold,
-                    Color(0x00000000),
-                  ]),
+              Text(
+                'Nasabah Setia Bank Bulungan',
+                style: TextStyle(
+                  fontSize: 31 * s,
+                  fontWeight: FontWeight.bold,
+                  color: _Bc.goldLight,
                 ),
               ),
-              SizedBox(height: 32 * s),
-              // Judul dengan efek shimmer emas.
-              AnimatedBuilder(
-                animation: _shimmer,
-                builder: (context, child) {
-                  final p = _shimmer.value;
-                  return ShaderMask(
-                    blendMode: BlendMode.srcIn,
-                    shaderCallback: (bounds) => LinearGradient(
-                      colors: const [
-                        AudienceTheme.gold,
-                        Color(0xFFFFF3C4),
-                        AudienceTheme.gold,
-                      ],
-                      stops: const [0.0, 0.5, 1.0],
-                      begin: Alignment(-2.6 + 3.2 * p, 0),
-                      end: Alignment(-0.6 + 3.2 * p, 0),
-                    ).createShader(bounds),
-                    child: child,
-                  );
-                },
-                child: Text('PENGUNDIAN HADIAH',
-                    style: AudienceTheme.title(84 * s)),
-              ),
-              SizedBox(height: 24 * s),
-              // "SEGERA DIMULAI" + titik animasi.
-              AnimatedBuilder(
-                animation: _dots,
-                builder: (context, _) {
-                  final n = 1 + (_dots.value * 2.999).floor();
-                  return Text('SEGERA DIMULAI${'.' * n}',
-                      style: AudienceTheme.subtitle(30 * s));
-                },
-              ),
-              if (widget.hadiah.isNotEmpty) ...[
-                SizedBox(height: 48 * s),
-                _FloatingPrizeChip(hadiah: widget.hadiah, scale: s),
-              ],
             ],
           ),
         ),
@@ -661,200 +721,730 @@ class _AnimatedIdleViewState extends State<_AnimatedIdleView>
   }
 }
 
-/// Chip hadiah yang mengambang lembut.
-class _FloatingPrizeChip extends StatefulWidget {
-  final String hadiah;
+/// Badge merah ● LIVE di pojok kanan atas.
+class _LiveBadge extends StatelessWidget {
   final double scale;
-  const _FloatingPrizeChip({required this.hadiah, this.scale = 1.0});
+  const _LiveBadge({required this.scale});
 
   @override
-  State<_FloatingPrizeChip> createState() => _FloatingPrizeChipState();
+  Widget build(BuildContext context) {
+    final s = scale;
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 24 * s, vertical: 10 * s),
+      decoration: BoxDecoration(
+        color: _Bc.liveRed,
+        borderRadius: BorderRadius.circular(14 * s),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0x80E53935),
+            blurRadius: 24 * s,
+            offset: Offset(0, 8 * s),
+          ),
+        ],
+      ),
+      child: Text(
+        '● LIVE',
+        style: TextStyle(
+          fontSize: 25 * s,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1 * s,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
 }
 
-class _FloatingPrizeChipState extends State<_FloatingPrizeChip>
+/// Ticker bawah: label "PEMENANG TERAKHIR" + maks 8 chip nomor kupon
+/// pemenang terakhir. Kosong → teks sambutan satu baris.
+class _Ticker extends StatelessWidget {
+  final double scale;
+  final List<String> items;
+  const _Ticker({required this.scale, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    return Container(
+      height: 76 * s,
+      padding: EdgeInsets.symmetric(horizontal: 24 * s),
+      decoration: BoxDecoration(
+        color: const Color(0xB3060C1F),
+        border: Border.all(color: const Color(0x8CD4AF37), width: 1.5 * s),
+        borderRadius: BorderRadius.circular(18 * s),
+      ),
+      child: Row(
+        children: [
+          Text(
+            'PEMENANG\nTERAKHIR',
+            style: TextStyle(
+              fontSize: 23 * s,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1 * s,
+              height: 1.15,
+              color: _Bc.goldLight,
+            ),
+          ),
+          SizedBox(width: 16 * s),
+          if (items.isEmpty)
+            Expanded(
+              child: Text(
+                'SELAMAT DATANG DI PENGUNDIAN HADIAH NASABAH SETIA '
+                'BANK BULUNGAN',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 24 * s,
+                  letterSpacing: 2 * s,
+                  color: _Bc.muted,
+                ),
+              ),
+            )
+          else
+            for (final n in items.take(8))
+              Expanded(
+                child: Container(
+                  margin: EdgeInsets.symmetric(horizontal: 4 * s),
+                  padding: EdgeInsets.symmetric(vertical: 6 * s),
+                  decoration: BoxDecoration(
+                    color: const Color(0xD91A3268),
+                    border: Border.all(
+                        color: const Color(0x73D4AF37), width: 1 * s),
+                    borderRadius: BorderRadius.circular(12 * s),
+                  ),
+                  child: Text(
+                    n,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 27 * s,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1 * s,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Panel hadiah (kolom kiri): foto full-bleed di dalam bingkai emas,
+/// pill label "HADIAH" menimpa batas foto, nama hadiah di bawahnya.
+/// TANPA kartu putih tambahan — foto langsung memenuhi area panel,
+/// jadi warna latar foto apa pun terlihat menyatu (sesuai mockup).
+class _PrizePanel extends StatelessWidget {
+  final double scale;
+  final String nama;
+  final String gambar;
+  const _PrizePanel(
+      {required this.scale, required this.nama, required this.gambar});
+
+  bool get _hasPrize => nama.isNotEmpty;
+  bool get _hasImage => gambar.isNotEmpty && File(gambar).existsSync();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    return Container(
+      width: 504 * s,
+      decoration: BoxDecoration(
+        color: _Bc.navyDeep,
+        border: Border.all(color: _Bc.gold, width: 2 * s),
+        borderRadius: BorderRadius.circular(28 * s),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0x66000000),
+            blurRadius: 60 * s,
+            offset: Offset(0, 24 * s),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28 * s),
+        child: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(child: _photoArea(s)),
+                  // Pill label overlap -26 ke area foto.
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: -26 * s,
+                    child: Center(child: _pill(s)),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding:
+                  EdgeInsets.fromLTRB(28 * s, 42 * s, 28 * s, 28 * s),
+              child: Text(
+                _hasPrize ? nama : 'PENGUNDIAN HADIAH',
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 33 * s,
+                  fontWeight: FontWeight.bold,
+                  height: 1.3,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _photoArea(double s) {
+    if (_hasImage) {
+      return Image.file(
+        File(gambar),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _placeholderFoto(s),
+      );
+    }
+    if (_hasPrize) return _placeholderFoto(s);
+    // Belum ada hadiah dipilih: gradient navy + ikon piala emas.
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_Bc.navy, _Bc.navyDeep],
+        ),
+      ),
+      child: Center(
+        child: Icon(Icons.emoji_events, size: 120 * s, color: _Bc.gold),
+      ),
+    );
+  }
+
+  /// Placeholder foto produk (gradient terang seperti mockup) untuk
+  /// hadiah terpilih yang belum punya file gambar.
+  Widget _placeholderFoto(double s) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFF4F7FB), Color(0xFFD9E4F2)],
+        ),
+      ),
+      child: Center(
+        child: Icon(Icons.image, size: 120 * s, color: const Color(0xFF5B6B8C)),
+      ),
+    );
+  }
+
+  Widget _pill(double s) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 44 * s, vertical: 10 * s),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [_Bc.goldLight, _Bc.gold],
+        ),
+        borderRadius: BorderRadius.circular(14 * s),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0x59000000),
+            blurRadius: 20 * s,
+            offset: Offset(0, 8 * s),
+          ),
+        ],
+      ),
+      child: Text(
+        'HADIAH',
+        style: TextStyle(
+          fontSize: 29 * s,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.5 * s,
+          color: _Bc.onGold,
+        ),
+      ),
+    );
+  }
+}
+
+/// Drum mesin undi (kolom tengah): lingkaran kaca emas Ø476 +
+/// pedestal emas + caption. Isi lingkaran tergantung stage.
+class _DrumShell extends StatelessWidget {
+  final double scale;
+  final Widget child;
+  const _DrumShell({required this.scale, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.topCenter,
+          children: [
+            Container(
+              width: 476 * s,
+              height: 476 * s,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border:
+                    Border.all(color: const Color(0xBFD4AF37), width: 3 * s),
+                gradient: const RadialGradient(
+                  center: Alignment(-0.3, -0.4),
+                  colors: [
+                    Color(0x38F3D27A),
+                    Color(0x0DD4AF37),
+                    Color(0x40000000),
+                  ],
+                  stops: [0.0, 0.55, 1.0],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0x73000000),
+                    blurRadius: 80 * s,
+                    offset: Offset(0, 36 * s),
+                  ),
+                ],
+              ),
+              child: Center(child: child),
+            ),
+            // Pedestal emas, overlap -16 ke lingkaran.
+            Positioned(
+              bottom: -16 * s,
+              child: Container(
+                width: 340 * s,
+                height: 32 * s,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [_Bc.goldDark, _Bc.gold],
+                  ),
+                  borderRadius: BorderRadius.circular(12 * s),
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 44 * s),
+        Text(
+          'MESIN PENGUNDI ELEKTRONIK',
+          style: TextStyle(
+            fontSize: 24 * s,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 3 * s,
+            color: _Bc.goldLight,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Panel peringatan amber di kolom tengah (kupon sudah pernah menang
+/// / kupon tidak terdaftar). Tanpa confetti — ini validasi, bukan
+/// perayaan.
+class _CenterWarning extends StatelessWidget {
+  final double scale;
+  final String title;
+  final String coupon;
+  final String? extra;
+  const _CenterWarning({
+    required this.scale,
+    required this.title,
+    required this.coupon,
+    this.extra,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.warning_amber, size: 130 * s, color: _Bc.amber),
+        SizedBox(height: 28 * s),
+        Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 54 * s,
+            fontWeight: FontWeight.w900,
+            color: _Bc.amberLight,
+          ),
+        ),
+        SizedBox(height: 24 * s),
+        Text(
+          coupon,
+          style: TextStyle(
+            fontSize: 64 * s,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        if (extra != null) ...[
+          SizedBox(height: 16 * s),
+          Text(
+            extra!,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 26 * s, color: _Bc.muted),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+enum _InfoMode { menunggu, winner, rejected, notFound }
+
+/// Panel info (kolom kanan): chip label, numbox emas, bar PEMENANG,
+/// kotak pemenang, dan teks penutup di bawah. Dipakai semua stage;
+/// pada layar imersif memakai varian kaca yang lebih pekat.
+class _InfoPanel extends StatelessWidget {
+  final double scale;
+  final bool immersive;
+  final String chipText;
+  final String numText;
+  final _InfoMode mode;
+  final String nama;
+  final String alamat;
+  final String rejectedLine;
+
+  /// Progres animasi munculnya kartu nama pemenang (0..1).
+  final double winnerReveal;
+
+  /// Progres animasi munculnya teks "Selamat Kepada Pemenang!" (0..1).
+  final double scriptReveal;
+
+  const _InfoPanel({
+    required this.scale,
+    required this.chipText,
+    required this.numText,
+    required this.mode,
+    this.immersive = false,
+    this.nama = '',
+    this.alamat = '',
+    this.rejectedLine = '',
+    this.winnerReveal = 1,
+    this.scriptReveal = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    return Container(
+      width: (immersive ? 544 : 524) * s,
+      padding: EdgeInsets.all(28 * s),
+      decoration: BoxDecoration(
+        color: immersive ? const Color(0xC70A1633) : const Color(0xA810224D),
+        border: Border.all(
+          color: Color(immersive ? 0xBFD4AF37 : 0x99D4AF37),
+          width: 1.5 * s,
+        ),
+        borderRadius: BorderRadius.circular(28 * s),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding:
+                  EdgeInsets.symmetric(horizontal: 24 * s, vertical: 8 * s),
+              decoration: BoxDecoration(
+                color: AudienceTheme.navy700,
+                border: Border.all(
+                    color: const Color(0x80D4AF37), width: 1 * s),
+                borderRadius: BorderRadius.circular(12 * s),
+              ),
+              child: Text(
+                chipText,
+                style: TextStyle(
+                  fontSize: 22 * s,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5 * s,
+                  color: _Bc.goldLight,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 20 * s),
+          // Numbox: label kecil DI DALAM kotak, di atas angka.
+          Container(
+            padding:
+                EdgeInsets.symmetric(horizontal: 12 * s, vertical: 16 * s),
+            decoration: BoxDecoration(
+              color: _Bc.goldLight,
+              borderRadius: BorderRadius.circular(18 * s),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  'NOMOR KUPON PEMENANG',
+                  style: TextStyle(
+                    fontSize: 18 * s,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 3 * s,
+                    color: _Bc.onGoldDim,
+                  ),
+                ),
+                SizedBox(height: 4 * s),
+                Text(
+                  numText,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 54 * s,
+                    fontWeight: FontWeight.w900,
+                    color: _Bc.navy,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 24 * s),
+          Container(
+            padding: EdgeInsets.symmetric(vertical: 10 * s),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [_Bc.goldLight, _Bc.gold],
+              ),
+              borderRadius:
+                  BorderRadius.vertical(top: Radius.circular(16 * s)),
+            ),
+            child: Text(
+              'PEMENANG',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 28 * s,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2 * s,
+                color: _Bc.onGold,
+              ),
+            ),
+          ),
+          Container(
+            padding:
+                EdgeInsets.symmetric(horizontal: 24 * s, vertical: 20 * s),
+            decoration: BoxDecoration(
+              color: const Color(0x99060C1F),
+              border: Border(
+                left: BorderSide(color: _Bc.gold, width: 1.5 * s),
+                right: BorderSide(color: _Bc.gold, width: 1.5 * s),
+                bottom: BorderSide(color: _Bc.gold, width: 1.5 * s),
+              ),
+              borderRadius:
+                  BorderRadius.vertical(bottom: Radius.circular(16 * s)),
+            ),
+            child: _winboxContent(s),
+          ),
+          const Spacer(),
+          _bottomText(s),
+        ],
+      ),
+    );
+  }
+
+  Widget _avatar(double s, IconData icon) {
+    return Container(
+      width: 76 * s,
+      height: 76 * s,
+      decoration:
+          const BoxDecoration(shape: BoxShape.circle, color: _Bc.goldLight),
+      child: Icon(icon, size: 40 * s, color: _Bc.navy),
+    );
+  }
+
+  Widget _winboxContent(double s) {
+    switch (mode) {
+      case _InfoMode.menunggu:
+        return Row(
+          children: [
+            _avatar(s, Icons.person),
+            SizedBox(width: 20 * s),
+            Expanded(
+              child: Text(
+                'Menunggu pengundian…',
+                style: TextStyle(fontSize: 24 * s, color: _Bc.muted),
+              ),
+            ),
+          ],
+        );
+      case _InfoMode.notFound:
+        return Row(
+          children: [
+            _avatar(s, Icons.search_off),
+            SizedBox(width: 20 * s),
+            Expanded(
+              child: Text(
+                'Nomor tidak ditemukan di data nasabah',
+                style: TextStyle(fontSize: 24 * s, color: _Bc.muted),
+              ),
+            ),
+          ],
+        );
+      case _InfoMode.rejected:
+        return Row(
+          children: [
+            _avatar(s, Icons.person),
+            SizedBox(width: 20 * s),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    nama,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 33 * s,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(height: 4 * s),
+                  Text(
+                    rejectedLine,
+                    style: TextStyle(fontSize: 21 * s, color: _Bc.muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      case _InfoMode.winner:
+        if (winnerReveal <= 0) {
+          return Row(
+            children: [
+              _avatar(s, Icons.person),
+              SizedBox(width: 20 * s),
+              Expanded(
+                child: Text(
+                  'Mengumumkan pemenang…',
+                  style: TextStyle(fontSize: 24 * s, color: _Bc.muted),
+                ),
+              ),
+            ],
+          );
+        }
+        return Opacity(
+          opacity: winnerReveal,
+          child: Transform.scale(
+            scale: 0.6 + 0.4 * winnerReveal,
+            child: Row(
+              children: [
+                _avatar(s, Icons.person),
+                SizedBox(width: 20 * s),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        nama,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 33 * s,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (alamat.trim().isNotEmpty) ...[
+                        SizedBox(height: 4 * s),
+                        Text(
+                          alamat,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              TextStyle(fontSize: 21 * s, color: _Bc.muted),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+    }
+  }
+
+  Widget _bottomText(double s) {
+    if (mode == _InfoMode.winner && scriptReveal > 0) {
+      return Opacity(
+        opacity: scriptReveal,
+        child: Text(
+          'Selamat\nKepada Pemenang!',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 46 * s,
+            fontWeight: FontWeight.bold,
+            fontStyle: FontStyle.italic,
+            height: 1.25,
+            color: _Bc.goldLight,
+          ),
+        ),
+      );
+    }
+    return Text(
+      'Nasabah Setia Bank Bulungan',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontSize: 24 * s,
+        fontStyle: FontStyle.italic,
+        color: _Bc.muted,
+      ),
+    );
+  }
+}
+
+/// Partikel emas melayang untuk layar idle (dipertahankan dari
+/// tampilan lama; digambar di atas background, di bawah panel).
+class _Sparkles extends StatefulWidget {
+  const _Sparkles();
+
+  @override
+  State<_Sparkles> createState() => _SparklesState();
+}
+
+class _SparklesState extends State<_Sparkles>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _float;
+  late final AnimationController _ctrl;
+  late final List<_Spark> _list;
+  final _rand = Random(42);
 
   @override
   void initState() {
     super.initState();
-    _float =
-        AnimationController(vsync: this, duration: const Duration(seconds: 3))
-          ..repeat(reverse: true);
+    _ctrl =
+        AnimationController(vsync: this, duration: const Duration(seconds: 11))
+          ..repeat();
+    _list = List.generate(70, (_) => _Spark.random(_rand));
   }
 
   @override
   void dispose() {
-    _float.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _float,
-      builder: (context, _) => Transform.translate(
-        offset: Offset(0, -8 * widget.scale * _float.value),
-        child: _PrizeChipStatic(hadiah: widget.hadiah, scale: widget.scale),
-      ),
-    );
-  }
-}
-
-class _PrizeChipStatic extends StatelessWidget {
-  final String hadiah;
-  final double scale;
-  const _PrizeChipStatic({required this.hadiah, this.scale = 1.0});
-
-  @override
-  Widget build(BuildContext context) {
-    final s = scale;
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 40 * s, vertical: 16 * s),
-      decoration: BoxDecoration(
-        border: Border.all(color: AudienceTheme.gold, width: 2),
-        borderRadius: BorderRadius.circular(999),
-        color: const Color(0x22D4AF37),
-      ),
-      child: Text(
-        hadiah,
-        style: TextStyle(
-          fontSize: 40 * s,
-          fontWeight: FontWeight.w600,
-          color: AudienceTheme.goldLight,
-          letterSpacing: 2 * s,
-        ),
-      ),
-    );
-  }
-}
-
-/// Nama hadiah sebagai HEADLINE di layar pemenang: ikon piala + teks
-/// emas besar. Ini info utama pengumuman ("menang apa") — harus terbaca
-/// dari jauh, jadi diperlakukan setara judul, bukan chip pendamping.
-/// Nama panjang diskalakan turun (FittedBox) agar selalu muat dan tidak
-/// menabrak gambar kiri-kanan.
-class _WinnerPrizeLine extends StatelessWidget {
-  final String hadiah;
-  final double scale;
-  final double maxWidth;
-  const _WinnerPrizeLine(
-      {required this.hadiah, required this.scale, required this.maxWidth});
-
-  @override
-  Widget build(BuildContext context) {
-    final s = scale;
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.emoji_events, size: 62 * s, color: AudienceTheme.gold),
-            SizedBox(width: 20 * s),
-            Text(
-              hadiah.toUpperCase(),
-              style: TextStyle(
-                fontSize: 76 * s,
-                fontWeight: FontWeight.w800,
-                color: AudienceTheme.goldLight,
-                letterSpacing: 2 * s,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Gambar hadiah di kiri & kanan layar, mengapit konten tengah.
-/// Muncul dengan fade + scale lembut; berganti mengikuti hadiah aktif.
-/// [size] = ukuran dasar kartu (px @ skala 1); [yFactor] = posisi
-/// vertikal Align (-1 atas .. 1 bawah; layar pemenang memakai -0.14
-/// agar gambar sejajar kotak nomor kupon, bukan tengah layar).
-class _PrizeSideImages extends StatelessWidget {
-  final String path;
-  final double scale;
-  final double size;
-  final double yFactor;
-  const _PrizeSideImages(
-      {super.key,
-      required this.path,
-      required this.scale,
-      this.size = 420,
-      this.yFactor = 0.0});
-
-  @override
-  Widget build(BuildContext context) {
-    final s = scale;
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeOut,
-      builder: (context, v, _) => Opacity(
-        opacity: v,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Align(
-              alignment: Alignment(-1, yFactor),
-              child: Padding(
-                padding: EdgeInsets.only(left: 36 * s),
-                child: Transform.scale(
-                  scale: 0.92 + 0.08 * v,
-                  child: _PrizeImageCard(path: path, scale: s, size: size),
-                ),
-              ),
-            ),
-            Align(
-              alignment: Alignment(1, yFactor),
-              child: Padding(
-                padding: EdgeInsets.only(right: 36 * s),
-                child: Transform.scale(
-                  scale: 0.92 + 0.08 * v,
-                  child: _PrizeImageCard(path: path, scale: s, size: size),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Satu kartu gambar hadiah: putih, sudut membulat, bingkai emas tipis.
-class _PrizeImageCard extends StatelessWidget {
-  final String path;
-  final double scale;
-  final double size;
-  const _PrizeImageCard(
-      {required this.path, required this.scale, this.size = 420});
-
-  @override
-  Widget build(BuildContext context) {
-    final s = scale;
-    if (!File(path).existsSync()) return const SizedBox.shrink();
-    return Container(
-      width: size * s,
-      height: size * s,
-      padding: EdgeInsets.all(14 * s),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24 * s),
-        border: Border.all(color: AudienceTheme.gold, width: 2),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x55000000), blurRadius: 24, offset: Offset(0, 10)),
-        ],
-      ),
-      child: Image.file(
-        File(path),
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-      ),
+    return Positioned.fill(
+      child: CustomPaint(painter: _SparksPainter(_ctrl, _list)),
     );
   }
 }
@@ -903,35 +1493,45 @@ class _SparksPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Layar pemenang animasi: kartu scale-in + hujan confetti emas.
-class _AnimatedWinnerView extends StatefulWidget {
+/// Scene pengumuman pemenang: nomor ng-roll ala mesin slot 2,6 detik
+/// (easeOutQuart, 45 frame — pola yang sama seperti sebelumnya), lalu
+/// mengunci + pop, kartu nama muncul, dan hujan confetti.
+///
+/// Varian non-imersif: panel hadiah | drum berisi nomor | panel info.
+/// Varian imersif: blok nomor/nama/hadiah di kiri bawah menimpa foto
+/// (nomor ikut ng-roll di numbox panel kanan + blok kiri), panel info
+/// kaca pekat di kanan.
+class _WinnerReveal extends StatefulWidget {
+  final String coupon;
   final String nama;
   final String alamat;
-  final String coupon;
   final String hadiah;
-
-  /// Ada gambar hadiah di kiri-kanan → kartu nama dipersempit agar
-  /// tidak pernah menabrak gambar.
-  final bool adaGambar;
+  final bool immersive;
   final double scale;
-  const _AnimatedWinnerView(
-      {super.key,
-      required this.nama,
-      required this.alamat,
-      required this.coupon,
-      required this.hadiah,
-      required this.adaGambar,
-      this.scale = 1.0});
+  final Widget prizePanel;
+
+  const _WinnerReveal({
+    super.key,
+    required this.coupon,
+    required this.nama,
+    required this.alamat,
+    required this.hadiah,
+    required this.immersive,
+    required this.scale,
+    required this.prizePanel,
+  });
 
   @override
-  State<_AnimatedWinnerView> createState() => _AnimatedWinnerViewState();
+  State<_WinnerReveal> createState() => _WinnerRevealState();
 }
 
-class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
+class _WinnerRevealState extends State<_WinnerReveal>
     with TickerProviderStateMixin {
   late final AnimationController _roll; // slot-machine nomor (2.6 dtk)
   late final CurvedAnimation _rollCurve; // easeOut = melambat di akhir
   late final AnimationController _reveal; // kartu nama + confetti
+  late final CurvedAnimation _nameCurve;
+  late final CurvedAnimation _scriptCurve;
   late final List<_Confetti> _pieces;
   final _rand = Random();
   bool _locked = false;
@@ -944,8 +1544,12 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
     _rollCurve = CurvedAnimation(parent: _roll, curve: Curves.easeOutQuart);
     _reveal = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 4500));
-    _roll.addStatusListener((s) {
-      if (s == AnimationStatus.completed && mounted) {
+    _nameCurve = CurvedAnimation(
+        parent: _reveal, curve: const Interval(0.1, 0.35));
+    _scriptCurve = CurvedAnimation(
+        parent: _reveal, curve: const Interval(0.35, 0.55));
+    _roll.addStatusListener((st) {
+      if (st == AnimationStatus.completed && mounted) {
         setState(() => _locked = true);
         // Fanfare diputar oleh window operator (sinkron via playReveal).
         _reveal.forward();
@@ -979,177 +1583,173 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
   @override
   Widget build(BuildContext context) {
     final s = widget.scale;
-    final entrance = CurvedAnimation(
-      parent: _reveal,
-      curve: const Interval(0.0, 0.3, curve: Curves.easeOutBack),
-    );
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: CustomPaint(
-            painter: _ConfettiPainter(_reveal, _pieces),
-          ),
-        ),
-        Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FadeTransition(
-                opacity: CurvedAnimation(
-                    parent: _roll, curve: const Interval(0.0, 0.25)),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('SELAMAT KEPADA', style: AudienceTheme.title(52 * s)),
-                    Text('PEMENANG', style: AudienceTheme.title(96 * s)),
-                    SizedBox(height: 12 * s),
-                    Text('PT. BPR Bank Bulungan',
-                        style: AudienceTheme.subtitle(26 * s)),
-                  ],
-                ),
+    return AnimatedBuilder(
+      animation: Listenable.merge([_roll, _reveal]),
+      builder: (context, _) {
+        final tick = (_rollCurve.value * 45).floor();
+        final display = _locked ? widget.coupon : _rollNumber(tick);
+        double pop = 1.0;
+        if (_locked) {
+          final p = (_reveal.value / 0.12).clamp(0.0, 1.0);
+          pop = 1.35 - 0.35 * Curves.easeOut.transform(p);
+        }
+        final info = _InfoPanel(
+          scale: s,
+          immersive: widget.immersive,
+          chipText: 'PENGUNDIAN HADIAH',
+          numText: display,
+          mode: _InfoMode.winner,
+          nama: widget.nama,
+          alamat: widget.alamat,
+          winnerReveal: _locked ? _nameCurve.value : 0,
+          scriptReveal: _locked ? _scriptCurve.value : 0,
+        );
+        return Stack(
+          children: [
+            if (widget.immersive) ...[
+              Positioned(
+                left: 16 * s,
+                bottom: 24 * s,
+                child: _immersiveBlock(s, display),
               ),
-              SizedBox(height: 44 * s),
-              // Kotak nomor: ng-roll seperti mesin slot, lalu mengunci.
-              AnimatedBuilder(
-                animation: Listenable.merge([_roll, _reveal]),
-                builder: (context, _) {
-                  final tick = (_rollCurve.value * 45).floor();
-                  final text = _locked ? widget.coupon : _rollNumber(tick);
-                  double scale = 1.0;
-                  if (_locked) {
-                    final p = (_reveal.value / 0.12).clamp(0.0, 1.0);
-                    scale = 1.35 - 0.35 * Curves.easeOut.transform(p);
-                  }
-                  return Transform.scale(
-                    scale: scale,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 64 * s, vertical: 28 * s),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            AudienceTheme.goldDark,
-                            AudienceTheme.gold,
-                            AudienceTheme.goldDark
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(24 * s),
-                        boxShadow: const [
-                          BoxShadow(
-                              color: Color(0x66000000),
-                              blurRadius: 40,
-                              offset: Offset(0, 14)),
-                        ],
-                      ),
+              Positioned(right: 0, top: 0, bottom: 0, child: info),
+            ] else
+              Row(
+                children: [
+                  widget.prizePanel,
+                  SizedBox(width: 36 * s),
+                  Expanded(
+                    child: _DrumShell(
+                      scale: s,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'NOMOR KUPON',
-                            style: TextStyle(
-                              fontSize: 20 * s,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 10 * s,
-                              color: AudienceTheme.navy800,
-                            ),
+                          Text('NOMOR KUPON', style: _drumLabelStyle(s)),
+                          SizedBox(height: 6 * s),
+                          Transform.scale(
+                            scale: pop,
+                            child: Text(display, style: _drumNumberStyle(s)),
                           ),
-                          SizedBox(height: 8 * s),
-                          Text(
-                            text,
-                            style: TextStyle(
-                              fontSize: 108 * s,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 14 * s,
-                              color: AudienceTheme.navy900,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures()
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-              SizedBox(height: 36 * s),
-              // Kartu nama muncul setelah nomor mengunci (layout tetap
-              // di-reserve agar tidak ada lompatan).
-              ScaleTransition(
-                scale: Tween<double>(begin: 0.6, end: 1.0).animate(entrance),
-                child: FadeTransition(
-                  opacity: CurvedAnimation(
-                      parent: _reveal, curve: const Interval(0.1, 0.35)),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 72 * s, vertical: 26 * s),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: AudienceTheme.gold, width: 2),
-                      borderRadius: BorderRadius.circular(20 * s),
-                      color: const Color(0x22000000),
-                    ),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                          maxWidth: (widget.adaGambar ? 940 : 1500) * s),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            widget.nama.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 56 * s,
-                              fontWeight: FontWeight.w800,
-                              color: AudienceTheme.goldLight,
-                              letterSpacing: 4 * s,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          // Baris alamat: pembeda bila nama pemenang sama.
-                          // Disembunyikan bila alamat kosong di data.
-                          if (widget.alamat.trim().isNotEmpty) ...[
-                            SizedBox(height: 14 * s),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.location_on,
-                                    color: AudienceTheme.gold, size: 32 * s),
-                                SizedBox(width: 10 * s),
-                                Flexible(
-                                  child: Text(
-                                    widget.alamat.toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 30 * s,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                      letterSpacing: 1 * s,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
                         ],
                       ),
                     ),
                   ),
+                  SizedBox(width: 36 * s),
+                  info,
+                ],
+              ),
+            // Confetti menutupi zona konten (dipertahankan dari
+            // tampilan lama; mulai setelah nomor mengunci).
+            Positioned.fill(
+              child: CustomPaint(painter: _ConfettiPainter(_reveal, _pieces)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Blok kiri-bawah layar imersif (mockup gabungan): pill PEMENANG,
+  /// label nomor kupon, nama pemenang, nama hadiah — semua menimpa
+  /// foto dengan shadow. Selama nomor masih ng-roll, yang tampil
+  /// angka berjalannya; nama & hadiah muncul setelah mengunci.
+  Widget _immersiveBlock(double s, String display) {
+    final shadows = [
+      Shadow(
+        color: const Color(0x99000000),
+        blurRadius: 14 * s,
+        offset: Offset(0, 3 * s),
+      ),
+    ];
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: 900 * s),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.bottomLeft,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding:
+                  EdgeInsets.symmetric(horizontal: 40 * s, vertical: 10 * s),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [_Bc.goldLight, _Bc.gold],
+                ),
+                borderRadius: BorderRadius.circular(14 * s),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.emoji_events, size: 30 * s, color: _Bc.onGold),
+                  SizedBox(width: 10 * s),
+                  Text(
+                    'PEMENANG',
+                    style: TextStyle(
+                      fontSize: 28 * s,
+                      fontWeight: FontWeight.w900,
+                      color: _Bc.onGold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 20 * s),
+            if (!_locked)
+              Text(
+                display,
+                style: TextStyle(
+                  fontSize: 68 * s,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  shadows: shadows,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              )
+            else ...[
+              Text(
+                'NOMOR KUPON ${widget.coupon}',
+                style: TextStyle(
+                  fontSize: 26 * s,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 3 * s,
+                  color: _Bc.goldLight,
+                  shadows: shadows,
                 ),
               ),
-              SizedBox(height: 32 * s),
-              if (widget.hadiah.isNotEmpty)
-                FadeTransition(
-                  opacity: CurvedAnimation(
-                      parent: _reveal, curve: const Interval(0.35, 0.55)),
-                  child: _WinnerPrizeLine(
-                      hadiah: widget.hadiah,
-                      scale: s,
-                      maxWidth: (widget.adaGambar ? 1000 : 1300) * s),
+              SizedBox(height: 10 * s),
+              Opacity(
+                opacity: _nameCurve.value,
+                child: Text(
+                  widget.nama.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 68 * s,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    shadows: shadows,
+                  ),
                 ),
+              ),
+              SizedBox(height: 6 * s),
+              Opacity(
+                opacity: _scriptCurve.value,
+                child: Text(
+                  widget.hadiah.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 50 * s,
+                    fontWeight: FontWeight.w900,
+                    color: _Bc.goldLight,
+                    shadows: shadows,
+                  ),
+                ),
+              ),
             ],
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
