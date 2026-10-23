@@ -4,6 +4,9 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'models.dart';
 
+/// Kolom urutan untuk daftar rekening (tabel Data Nasabah & export).
+enum AccountSort { kupon, rekening, nama, saldo, jumlahKupon, status }
+
 /// Lapisan database SQLite (dipakai HANYA dari window operator).
 class DatabaseHelper {
   DatabaseHelper._();
@@ -203,6 +206,8 @@ class DatabaseHelper {
     required int limit,
     required int offset,
     String query = '',
+    AccountSort sort = AccountSort.kupon,
+    bool ascending = true,
   }) async {
     final d = await db;
     final q = query.trim();
@@ -210,17 +215,37 @@ class DatabaseHelper {
       'accounts',
       where: q.isEmpty ? null : 'nama LIKE ? OR rekening LIKE ?',
       whereArgs: q.isEmpty ? null : ['%$q%', '%$q%'],
-      orderBy: 'coupon_start ASC',
+      orderBy: _accountOrderBy(sort, ascending),
       limit: limit,
       offset: offset,
     );
     return r.map(Account.fromMap).toList();
   }
 
+  /// Klausa ORDER BY (whitelist) untuk [AccountSort]; tiebreak deterministik
+  /// agar paginasi stabil antar-halaman.
+  static String _accountOrderBy(AccountSort sort, bool ascending) {
+    final dir = ascending ? 'ASC' : 'DESC';
+    return switch (sort) {
+      AccountSort.kupon => 'coupon_start $dir, id $dir',
+      AccountSort.rekening => 'LENGTH(rekening) $dir, rekening $dir, id $dir',
+      AccountSort.nama => 'nama COLLATE NOCASE $dir, coupon_start ASC',
+      AccountSort.saldo => 'saldo $dir, coupon_start ASC',
+      AccountSort.jumlahKupon => 'kupon_count $dir, coupon_start ASC',
+      AccountSort.status => 'has_won $dir, coupon_start ASC',
+    };
+  }
+
   /// Semua rekening yang cocok dengan pencarian (tanpa paginasi),
   /// untuk export CSV. Semantik filter sama persis dengan tabel.
-  Future<List<Account>> getAccountsFiltered(String query) =>
-      getAccountsPage(limit: 1 << 30, offset: 0, query: query);
+  Future<List<Account>> getAccountsFiltered(String query,
+          {AccountSort sort = AccountSort.kupon, bool ascending = true}) =>
+      getAccountsPage(
+          limit: 1 << 30,
+          offset: 0,
+          query: query,
+          sort: sort,
+          ascending: ascending);
 
   /// Rekening berdasarkan daftar id (untuk export pilihan/ceklis),
   /// diurutkan mengikuti nomor kupon.

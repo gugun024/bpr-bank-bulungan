@@ -326,6 +326,76 @@ void main() {
     expect(await db.getSetting('tidak_ada'), isNull);
   });
 
+  test('sort Data Nasabah: saldo, nama, jumlah kupon, rekening', () async {
+    final db = DatabaseHelper.instance;
+    await db.replaceAllAccounts(const [
+      Account(
+          rekening: '9001',
+          rekeningLama: '',
+          nama: 'alpha',
+          alamat: '',
+          saldo: 300000,
+          kuponCount: 3,
+          couponStart: 1,
+          couponEnd: 3),
+      Account(
+          rekening: '9002',
+          rekeningLama: '',
+          nama: 'Zulu',
+          alamat: '',
+          saldo: 100000,
+          kuponCount: 1,
+          couponStart: 4,
+          couponEnd: 4),
+      Account(
+          rekening: '9003',
+          rekeningLama: '',
+          nama: 'bravo',
+          alamat: '',
+          saldo: 200000,
+          kuponCount: 5,
+          couponStart: 5,
+          couponEnd: 9),
+    ]);
+
+    List<String> names(List<Account> a) => a.map((e) => e.nama).toList();
+
+    // Default: urutan nomor kupon.
+    expect(names(await db.getAccountsPage(limit: 10, offset: 0)),
+        ['alpha', 'Zulu', 'bravo']);
+    // Saldo menurun.
+    expect(
+        names(await db.getAccountsPage(
+            limit: 10, offset: 0, sort: AccountSort.saldo, ascending: false)),
+        ['alpha', 'bravo', 'Zulu']);
+    // Nama naik, case-insensitive (alpha < bravo < Zulu).
+    expect(
+        names(await db.getAccountsPage(
+            limit: 10, offset: 0, sort: AccountSort.nama)),
+        ['alpha', 'bravo', 'Zulu']);
+    // Jumlah kupon menurun.
+    expect(
+        names(await db.getAccountsPage(
+            limit: 10,
+            offset: 0,
+            sort: AccountSort.jumlahKupon,
+            ascending: false)),
+        ['bravo', 'alpha', 'Zulu']);
+    // Rekening menurun.
+    expect(
+        names(await db.getAccountsPage(
+            limit: 10,
+            offset: 0,
+            sort: AccountSort.rekening,
+            ascending: false)),
+        ['bravo', 'Zulu', 'alpha']);
+    // Export (getAccountsFiltered) mengikuti sort yang sama.
+    expect(
+        names(await db.getAccountsFiltered('',
+            sort: AccountSort.saldo, ascending: false)),
+        ['alpha', 'bravo', 'Zulu']);
+  });
+
   test('gambar hadiah: kolom image_path + setPrizeImage', () async {
     final db = DatabaseHelper.instance;
     final id = await db.insertPrize(

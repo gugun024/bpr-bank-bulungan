@@ -72,6 +72,32 @@ class _DataTabState extends State<DataTab> {
   bool _busy = false;
   final Set<int> _selected = {}; // id rekening terpilih (untuk hapus bulk)
 
+  // Urutan tabel: kolom DataTable -> AccountSort. Default = Rentang Kupon
+  // naik (urutan nomor kupon, sama seperti sebelum fitur sort ada).
+  int _sortColumn = 5;
+  bool _sortAsc = true;
+  static const _sortByColumn = <int, AccountSort>{
+    1: AccountSort.rekening,
+    2: AccountSort.nama,
+    3: AccountSort.saldo,
+    4: AccountSort.jumlahKupon,
+    5: AccountSort.kupon,
+    6: AccountSort.status,
+  };
+  AccountSort get _sort => _sortByColumn[_sortColumn] ?? AccountSort.kupon;
+
+  /// Klik header kolom: kolom baru mulai dari naik (ASC); klik kolom yang
+  /// sama membalik arah. Urutan berlaku ke seluruh hasil filter (di SQL),
+  /// bukan hanya halaman yang tampil.
+  void _onSort(int columnIndex, bool ascending) {
+    setState(() {
+      _sortAsc = columnIndex == _sortColumn ? ascending : true;
+      _sortColumn = columnIndex;
+      _page = 0;
+    });
+    _load();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -97,6 +123,8 @@ class _DataTabState extends State<DataTab> {
         limit: _pageSize,
         offset: page * _pageSize,
         query: _query,
+        sort: _sort,
+        ascending: _sortAsc,
       );
       final coupons = await db.totalCoupons();
       if (!mounted) return;
@@ -224,7 +252,8 @@ class _DataTabState extends State<DataTab> {
       final db = DatabaseHelper.instance;
       final accounts = _selected.isNotEmpty
           ? await db.getAccountsByIds(_selected.toList())
-          : await db.getAccountsFiltered(_query);
+          : await db.getAccountsFiltered(_query,
+              sort: _sort, ascending: _sortAsc);
       if (accounts.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -432,6 +461,8 @@ class _DataTabState extends State<DataTab> {
                             child: DataTable(
                           onSelectAll: (v) =>
                               _toggleSelectPage(v == true),
+                          sortColumnIndex: _sortColumn,
+                          sortAscending: _sortAsc,
                           headingRowColor:
                               WidgetStateProperty.all(OpTheme.navySoft),
                           headingTextStyle: const TextStyle(
@@ -440,16 +471,27 @@ class _DataTabState extends State<DataTab> {
                               fontSize: 13),
                           dataTextStyle: const TextStyle(
                               fontSize: 13, color: Color(0xFF1E2A45)),
-                          columns: const [
-                            DataColumn(label: Text('No')),
-                            DataColumn(label: Text('No. Rekening')),
-                            DataColumn(label: Text('Nama')),
+                          columns: [
+                            const DataColumn(label: Text('No')),
                             DataColumn(
-                                label: Text('Saldo (Rp)'), numeric: true),
-                            DataColumn(label: Text('Kupon'), numeric: true),
-                            DataColumn(label: Text('Rentang Kupon')),
-                            DataColumn(label: Text('Status')),
-                            DataColumn(label: Text('Aksi')),
+                                label: const Text('No. Rekening'),
+                                onSort: _onSort),
+                            DataColumn(
+                                label: const Text('Nama'), onSort: _onSort),
+                            DataColumn(
+                                label: const Text('Saldo (Rp)'),
+                                numeric: true,
+                                onSort: _onSort),
+                            DataColumn(
+                                label: const Text('Kupon'),
+                                numeric: true,
+                                onSort: _onSort),
+                            DataColumn(
+                                label: const Text('Rentang Kupon'),
+                                onSort: _onSort),
+                            DataColumn(
+                                label: const Text('Status'), onSort: _onSort),
+                            const DataColumn(label: Text('Aksi')),
                           ],
                           rows: [
                             for (var i = 0; i < _rows.length; i++)
