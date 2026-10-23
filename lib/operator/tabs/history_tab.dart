@@ -127,12 +127,13 @@ class _HistoryTabState extends State<HistoryTab> {
       final file = File(p.join(dir.path,
           'pemenang_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.csv'));
       await file.writeAsString(csv);
-      // Tawarkan simpan ke lokasi lain.
+      // Tawarkan simpan ke lokasi lain. (file_picker Windows hanya
+      // mengembalikan path — file ditulis sendiri, lihat data_tab.)
       final savePath = await FilePicker.platform.saveFile(
         dialogTitle: 'Simpan daftar pemenang',
         fileName: p.basename(file.path),
-        bytes: await file.readAsBytes(),
       );
+      if (savePath != null) await file.copy(savePath);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

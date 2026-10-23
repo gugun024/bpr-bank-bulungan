@@ -270,8 +270,11 @@ class _DataTabState extends State<DataTab> {
       final savePath = await FilePicker.platform.saveFile(
         dialogTitle: 'Simpan data nasabah',
         fileName: p.basename(file.path),
-        bytes: await file.readAsBytes(),
       );
+      // PENTING: file_picker di Windows HANYA mengembalikan path dari
+      // dialog simpan (argumen bytes diabaikan) — file wajib ditulis
+      // sendiri ke path pilihan user, kalau tidak export-nya hilang.
+      if (savePath != null) await file.copy(savePath);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
