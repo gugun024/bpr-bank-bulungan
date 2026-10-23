@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
@@ -43,6 +44,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   String _coupon = '';
   String _nama = '';
   String _alamat = '';
+  String _gambar = '';
   String _hadiah = '';
   String _rejectedRekening = '';
   String _rejectedWaktu = '';
@@ -125,8 +127,10 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
       case AudienceProtocol.startShuffle:
         setState(() {
           _stage = _Stage.shuffle;
-          final prize = (call.arguments as Map?)?[AudienceProtocol.argHadiah];
+          final a = (call.arguments as Map?) ?? {};
+          final prize = a[AudienceProtocol.argHadiah];
           if (prize is String && prize.isNotEmpty) _hadiah = prize;
+          _gambar = (a[AudienceProtocol.argGambar] ?? '').toString();
         });
         _startRoll();
         break;
@@ -140,6 +144,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           _coupon = (args[AudienceProtocol.argCoupon] ?? '').toString();
           _nama = (args[AudienceProtocol.argNama] ?? '').toString();
           _alamat = (args[AudienceProtocol.argAlamat] ?? '').toString();
+          _gambar = (args[AudienceProtocol.argGambar] ?? '').toString();
           _hadiah = (args[AudienceProtocol.argHadiah] ?? '').toString();
           _stage = _Stage.winner;
         });
@@ -148,6 +153,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         final args = (call.arguments as Map?) ?? {};
         setState(() {
           _hadiah = (args[AudienceProtocol.argHadiah] ?? '').toString();
+          _gambar = (args[AudienceProtocol.argGambar] ?? '').toString();
           // Hadiah baru = undian sebelumnya selesai → kembali ke idle,
           // kecuali sedang mengocok (mode random).
           if (_stage != _Stage.shuffle) _stage = _Stage.idle;
@@ -232,6 +238,16 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
                   _Stage.notFound => _notFoundView(s),
                 },
               ),
+              // Gambar hadiah kiri-kanan (idle / kocokan / pemenang).
+              if (_gambar.isNotEmpty &&
+                  (_stage == _Stage.idle ||
+                      _stage == _Stage.shuffle ||
+                      _stage == _Stage.winner))
+                _PrizeSideImages(
+                  key: ValueKey('side-$_gambar-$_stage'),
+                  path: _gambar,
+                  scale: s,
+                ),
             ],
           ),
         ),
@@ -275,6 +291,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         alamat: _alamat,
         coupon: _coupon,
         hadiah: _hadiah,
+        adaGambar: _gambar.isNotEmpty,
         scale: s,
       );
 
@@ -719,6 +736,86 @@ class _PrizeChipStatic extends StatelessWidget {
   }
 }
 
+/// Gambar hadiah di kiri & kanan layar, mengapit konten tengah.
+/// Muncul dengan fade + scale lembut; berganti mengikuti hadiah aktif.
+class _PrizeSideImages extends StatelessWidget {
+  final String path;
+  final double scale;
+  const _PrizeSideImages({super.key, required this.path, required this.scale});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOut,
+      builder: (context, v, _) => Opacity(
+        opacity: v,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned(
+              left: 48 * s,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Transform.scale(
+                  scale: 0.92 + 0.08 * v,
+                  child: _PrizeImageCard(path: path, scale: s),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 48 * s,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: Transform.scale(
+                  scale: 0.92 + 0.08 * v,
+                  child: _PrizeImageCard(path: path, scale: s),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Satu kartu gambar hadiah: putih, sudut membulat, bingkai emas tipis.
+class _PrizeImageCard extends StatelessWidget {
+  final String path;
+  final double scale;
+  const _PrizeImageCard({required this.path, required this.scale});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    if (!File(path).existsSync()) return const SizedBox.shrink();
+    return Container(
+      width: 300 * s,
+      height: 300 * s,
+      padding: EdgeInsets.all(14 * s),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24 * s),
+        border: Border.all(color: AudienceTheme.gold, width: 2),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x55000000), blurRadius: 24, offset: Offset(0, 10)),
+        ],
+      ),
+      child: Image.file(
+        File(path),
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      ),
+    );
+  }
+}
+
 /// Satu partikel cahaya emas.
 class _Spark {
   double x0, phase, speed, size, driftAmp, swayFreq, alpha;
@@ -769,6 +866,10 @@ class _AnimatedWinnerView extends StatefulWidget {
   final String alamat;
   final String coupon;
   final String hadiah;
+
+  /// Ada gambar hadiah di kiri-kanan → kartu nama dipersempit agar
+  /// tidak pernah menabrak gambar.
+  final bool adaGambar;
   final double scale;
   const _AnimatedWinnerView(
       {super.key,
@@ -776,6 +877,7 @@ class _AnimatedWinnerView extends StatefulWidget {
       required this.alamat,
       required this.coupon,
       required this.hadiah,
+      required this.adaGambar,
       this.scale = 1.0});
 
   @override
@@ -944,7 +1046,8 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                       color: const Color(0x22000000),
                     ),
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: 1500 * s),
+                      constraints: BoxConstraints(
+                          maxWidth: (widget.adaGambar ? 1180 : 1500) * s),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [

@@ -326,6 +326,28 @@ void main() {
     expect(await db.getSetting('tidak_ada'), isNull);
   });
 
+  test('gambar hadiah: kolom image_path + setPrizeImage', () async {
+    final db = DatabaseHelper.instance;
+    final id = await db.insertPrize(
+        Prize(name: 'Kulkas', urutan: 0, qty: 1, imagePath: '/tmp/a.png'));
+    var prizes = await db.getPrizes();
+    expect(prizes.singleWhere((p) => p.id == id).imagePath, '/tmp/a.png');
+
+    await db.setPrizeImage(id, '/gambar/hadiah_1.jpg');
+    prizes = await db.getPrizes();
+    expect(prizes.singleWhere((p) => p.id == id).imagePath,
+        '/gambar/hadiah_1.jpg');
+
+    await db.setPrizeImage(id, '');
+    prizes = await db.getPrizes();
+    expect(prizes.singleWhere((p) => p.id == id).imagePath, '');
+
+    // Default: tanpa gambar.
+    final id2 = await db.insertPrize(Prize(name: 'TV', urutan: 1, qty: 1));
+    prizes = await db.getPrizes();
+    expect(prizes.singleWhere((p) => p.id == id2).imagePath, '');
+  });
+
   test('import hadiah: autoMap + buildPrizes + replaceAllPrizes', () async {
     // AutoMap mengenali header Indonesia/Inggris.
     var m = PrizeImportService.autoMap(['Nama Hadiah', 'Jumlah']);

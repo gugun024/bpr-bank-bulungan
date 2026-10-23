@@ -36,17 +36,26 @@ class DatabaseHelper {
     return databaseFactoryFfi.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 2,
+        version: 3,
         onCreate: (db, version) async {
           await _createV1(db);
           await _createSettings(db);
+          await _addPrizeImageColumn(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           // v1 → v2: tambah tabel settings (tanpa mengganggu data).
           if (oldVersion < 2) await _createSettings(db);
+          // v2 → v3: kolom gambar hadiah.
+          if (oldVersion < 3) await _addPrizeImageColumn(db);
         },
       ),
     );
+  }
+
+  /// v3: kolom path gambar pada tabel prizes ('' = tanpa gambar).
+  static Future<void> _addPrizeImageColumn(Database db) async {
+    await db.execute(
+        "ALTER TABLE prizes ADD COLUMN image_path TEXT NOT NULL DEFAULT ''");
   }
 
   /// Skema awal (v1): accounts, prizes, winners.
@@ -288,6 +297,13 @@ class DatabaseHelper {
     final d = await db;
     await d.update('prizes', prize.toMap(),
         where: 'id = ?', whereArgs: [prize.id]);
+  }
+
+  /// Set / kosongkan path gambar hadiah (update parsial).
+  Future<void> setPrizeImage(int id, String path) async {
+    final d = await db;
+    await d.update('prizes', {'image_path': path},
+        where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> deletePrize(int id) async {

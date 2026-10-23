@@ -96,8 +96,10 @@ class _RandomTabState extends State<RandomTab> {
     DatabaseHelper.instance
         .setSetting(_kSelectedPrize, p?.id?.toString() ?? '');
     if (p != null) {
-      AudienceChannel.send(
-          AudienceProtocol.showPrize, {AudienceProtocol.argHadiah: p.name});
+      AudienceChannel.send(AudienceProtocol.showPrize, {
+        AudienceProtocol.argHadiah: p.name,
+        AudienceProtocol.argGambar: p.imagePath,
+      });
     }
   }
 
@@ -110,6 +112,7 @@ class _RandomTabState extends State<RandomTab> {
     try {
       await AudienceChannel.send(AudienceProtocol.startShuffle, {
         AudienceProtocol.argHadiah: _prize!.name,
+        AudienceProtocol.argGambar: _prize!.imagePath,
       });
       // Tick kocokan diputar dari window operator selama penonton
       // ng-roll; berhenti saat Konfirmasi / Batal / pool kosong.
@@ -151,6 +154,7 @@ class _RandomTabState extends State<RandomTab> {
             Account.formatCoupon(drawn.couponNo, _couponWidth),
         AudienceProtocol.argNama: drawn.account.nama,
         AudienceProtocol.argAlamat: drawn.account.alamat,
+        AudienceProtocol.argGambar: prize.imagePath,
         AudienceProtocol.argHadiah: prize.name,
       });
       // Kocokan berhenti, ganti urutan reveal (tick melambat + fanfare).

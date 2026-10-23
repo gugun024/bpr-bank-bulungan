@@ -1,4 +1,9 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as pth;
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/database.dart';
 import '../../core/models.dart';
@@ -275,6 +280,112 @@ class _PrizesTabState extends State<PrizesTab> {
     );
   }
 
+  /// Pilih file gambar, salin ke folder aplikasi, simpan path-nya.
+  /// Mengembalikan path tujuan, atau null bila batal.
+  Future<String?> _pickAndStoreImage(Prize p) async {
+    final res = await FilePicker.platform
+        .pickFiles(type: FileType.image, allowMultiple: false);
+    final src = res?.files.single.path;
+    if (src == null) return null;
+    final docs = await getApplicationDocumentsDirectory();
+    final dir = Directory(pth.join(docs.path, 'gambar_hadiah'));
+    await dir.create(recursive: true);
+    var ext = pth.extension(src).toLowerCase();
+    if (ext.isEmpty) ext = '.png';
+    // Bersihkan salinan berekstensi lain dari gambar sebelumnya.
+    for (final e in ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif']) {
+      if (e == ext) continue;
+      final old = File(pth.join(dir.path, 'hadiah_${p.id}$e'));
+      if (await old.exists()) await old.delete();
+    }
+    final dest = pth.join(dir.path, 'hadiah_${p.id}$ext');
+    await File(src).copy(dest);
+    await DatabaseHelper.instance.setPrizeImage(p.id!, dest);
+    return dest;
+  }
+
+  /// Dialog kelola gambar satu hadiah: pratinjau + pasang/ganti/hapus.
+  Future<void> _imageDialog(Prize p) async {
+    var current = p.imagePath;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: Text('Gambar — ${p.name}'),
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                    'Gambar tampil di kiri & kanan layar penonton saat '
+                    'hadiah ini diundi. Pakai gambar produk berlatar polos '
+                    'untuk hasil terbaik.',
+                    style:
+                        TextStyle(fontSize: 12.5, color: OpTheme.textMuted)),
+                const SizedBox(height: 14),
+                Container(
+                  height: 220,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: OpTheme.cardBorder),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: current.isNotEmpty && File(current).existsSync()
+                      ? Image.file(File(current), fit: BoxFit.contain)
+                      : const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.image_not_supported_outlined,
+                                  size: 40, color: OpTheme.textMuted),
+                              SizedBox(height: 8),
+                              Text('Belum ada gambar',
+                                  style: TextStyle(color: OpTheme.textMuted)),
+                            ],
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            if (current.isNotEmpty)
+              TextButton(
+                onPressed: () async {
+                  await DatabaseHelper.instance.setPrizeImage(p.id!, '');
+                  final f = File(current);
+                  if (await f.exists()) await f.delete();
+                  setDlg(() => current = '');
+                  _load();
+                },
+                style:
+                    TextButton.styleFrom(foregroundColor: OpTheme.danger),
+                child: const Text('Hapus Gambar'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Tutup'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                final stored = await _pickAndStoreImage(p);
+                if (stored != null) {
+                  setDlg(() => current = stored);
+                  _load();
+                }
+              },
+              icon: const Icon(Icons.upload_file, size: 18),
+              label: Text(current.isEmpty ? 'Pilih Gambar' : 'Ganti Gambar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _prizeCard(Prize p, int index) {
     final won = _wonCount[p.id] ?? 0;
     final left = p.qty - won;
@@ -356,10 +467,33 @@ class _PrizesTabState extends State<PrizesTab> {
                         fontSize: 12, color: OpTheme.textMuted)),
               ],
             ),
+            if (p.imagePath.isNotEmpty && File(p.imagePath).existsSync()) ...[
+              const SizedBox(height: 12),
+              Container(
+                height: 110,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: OpTheme.cardBorder),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.file(File(p.imagePath), fit: BoxFit.contain),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                TextButton.icon(
+                  onPressed: () => _imageDialog(p),
+                  icon: Icon(
+                      p.imagePath.isEmpty
+                          ? Icons.add_photo_alternate_outlined
+                          : Icons.image_outlined,
+                      size: 16),
+                  label: const Text('Gambar'),
+                ),
                 TextButton.icon(
                   onPressed: () => _dialog(existing: p),
                   icon: const Icon(Icons.edit, size: 16),

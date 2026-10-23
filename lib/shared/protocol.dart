@@ -10,12 +10,15 @@ class AudienceProtocol {
   static const String startShuffle = 'startShuffle';
   static const String stopShuffle = 'stopShuffle';
 
-  /// args: {coupon: String, nama: String, alamat: String, hadiah: String}
+  /// args: {coupon: String, nama: String, alamat: String, hadiah: String,
+  ///         gambar: String}
   /// alamat ditampilkan di kartu nama pemenang (pembedaan nama yang sama);
   /// boleh kosong — baris alamat disembunyikan.
+  /// gambar = path file gambar hadiah ('' = tanpa gambar).
   static const String showWinner = 'showWinner';
 
-  /// args: {hadiah: String} — tampilkan hadiah yang sedang diundi
+  /// args: {hadiah: String, gambar: String} — tampilkan hadiah yang
+  /// sedang diundi (gambar boleh kosong).
   static const String showPrize = 'showPrize';
 
   /// operator → penonton: tampilkan info penolakan
@@ -47,6 +50,7 @@ class AudienceProtocol {
   static const String argCoupon = 'coupon';
   static const String argNama = 'nama';
   static const String argAlamat = 'alamat';
+  static const String argGambar = 'gambar';
   static const String argHadiah = 'hadiah';
   static const String argMuted = 'muted';
   static const String argRekening = 'rekening';

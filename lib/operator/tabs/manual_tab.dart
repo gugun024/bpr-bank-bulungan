@@ -108,8 +108,10 @@ class _ManualTabState extends State<ManualTab> {
         .setSetting(_kSelectedPrize, p?.id?.toString() ?? '');
     // Umumkan "hadiah berikutnya" ke layar penonton.
     if (p != null) {
-      AudienceChannel.send(
-          AudienceProtocol.showPrize, {AudienceProtocol.argHadiah: p.name});
+      AudienceChannel.send(AudienceProtocol.showPrize, {
+        AudienceProtocol.argHadiah: p.name,
+        AudienceProtocol.argGambar: p.imagePath,
+      });
     }
   }
 
@@ -193,6 +195,7 @@ class _ManualTabState extends State<ManualTab> {
             Account.formatCoupon(found.couponNo, _couponWidth),
         AudienceProtocol.argNama: found.account.nama,
         AudienceProtocol.argAlamat: found.account.alamat,
+        AudienceProtocol.argGambar: prize.imagePath,
         AudienceProtocol.argHadiah: prize.name,
       });
       // Suara reveal (tick melambat 2,6 dtk + fanfare) diputar dari

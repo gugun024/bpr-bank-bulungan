@@ -62,17 +62,31 @@ class Prize {
   final int urutan;
   final int qty;
 
-  const Prize(
-      {this.id, required this.name, required this.urutan, this.qty = 1});
+  /// Path file gambar hadiah (di folder aplikasi); '' = tanpa gambar.
+  /// Gambar tampil di kiri-kanan layar penonton saat hadiah diundi.
+  final String imagePath;
 
-  Map<String, Object?> toMap() =>
-      {'id': id, 'name': name, 'urutan': urutan, 'qty': qty};
+  const Prize(
+      {this.id,
+      required this.name,
+      required this.urutan,
+      this.qty = 1,
+      this.imagePath = ''});
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'name': name,
+        'urutan': urutan,
+        'qty': qty,
+        'image_path': imagePath
+      };
 
   factory Prize.fromMap(Map<String, Object?> m) => Prize(
         id: m['id'] as int?,
         name: (m['name'] ?? '') as String,
         urutan: (m['urutan'] ?? 0) as int,
         qty: (m['qty'] ?? 1) as int,
+        imagePath: (m['image_path'] ?? '') as String,
       );
 }
 
