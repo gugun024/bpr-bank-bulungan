@@ -239,6 +239,8 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
                 },
               ),
               // Gambar hadiah kiri-kanan (idle / kocokan / pemenang).
+              // Pemenang & kocokan: 420px sejajar kotak kupon (di atas
+              // tengah layar); idle: 360px di tengah (judulnya lebar).
               if (_gambar.isNotEmpty &&
                   (_stage == _Stage.idle ||
                       _stage == _Stage.shuffle ||
@@ -247,6 +249,8 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
                   key: ValueKey('side-$_gambar-$_stage'),
                   path: _gambar,
                   scale: s,
+                  size: _stage == _Stage.idle ? 360 : 420,
+                  yFactor: _stage == _Stage.winner ? -0.14 : 0.0,
                 ),
             ],
           ),
@@ -738,10 +742,20 @@ class _PrizeChipStatic extends StatelessWidget {
 
 /// Gambar hadiah di kiri & kanan layar, mengapit konten tengah.
 /// Muncul dengan fade + scale lembut; berganti mengikuti hadiah aktif.
+/// [size] = ukuran dasar kartu (px @ skala 1); [yFactor] = posisi
+/// vertikal Align (-1 atas .. 1 bawah; layar pemenang memakai -0.14
+/// agar gambar sejajar kotak nomor kupon, bukan tengah layar).
 class _PrizeSideImages extends StatelessWidget {
   final String path;
   final double scale;
-  const _PrizeSideImages({super.key, required this.path, required this.scale});
+  final double size;
+  final double yFactor;
+  const _PrizeSideImages(
+      {super.key,
+      required this.path,
+      required this.scale,
+      this.size = 420,
+      this.yFactor = 0.0});
 
   @override
   Widget build(BuildContext context) {
@@ -755,25 +769,23 @@ class _PrizeSideImages extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Positioned(
-              left: 48 * s,
-              top: 0,
-              bottom: 0,
-              child: Center(
+            Align(
+              alignment: Alignment(-1, yFactor),
+              child: Padding(
+                padding: EdgeInsets.only(left: 36 * s),
                 child: Transform.scale(
                   scale: 0.92 + 0.08 * v,
-                  child: _PrizeImageCard(path: path, scale: s),
+                  child: _PrizeImageCard(path: path, scale: s, size: size),
                 ),
               ),
             ),
-            Positioned(
-              right: 48 * s,
-              top: 0,
-              bottom: 0,
-              child: Center(
+            Align(
+              alignment: Alignment(1, yFactor),
+              child: Padding(
+                padding: EdgeInsets.only(right: 36 * s),
                 child: Transform.scale(
                   scale: 0.92 + 0.08 * v,
-                  child: _PrizeImageCard(path: path, scale: s),
+                  child: _PrizeImageCard(path: path, scale: s, size: size),
                 ),
               ),
             ),
@@ -788,15 +800,17 @@ class _PrizeSideImages extends StatelessWidget {
 class _PrizeImageCard extends StatelessWidget {
   final String path;
   final double scale;
-  const _PrizeImageCard({required this.path, required this.scale});
+  final double size;
+  const _PrizeImageCard(
+      {required this.path, required this.scale, this.size = 420});
 
   @override
   Widget build(BuildContext context) {
     final s = scale;
     if (!File(path).existsSync()) return const SizedBox.shrink();
     return Container(
-      width: 300 * s,
-      height: 300 * s,
+      width: size * s,
+      height: size * s,
       padding: EdgeInsets.all(14 * s),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1047,7 +1061,7 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                     ),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                          maxWidth: (widget.adaGambar ? 1180 : 1500) * s),
+                          maxWidth: (widget.adaGambar ? 940 : 1500) * s),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
