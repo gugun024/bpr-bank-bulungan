@@ -473,7 +473,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         child: Text(
           hadiah,
           style: TextStyle(
-            fontSize: 40 * s,
+            fontSize: 48 * s,
             fontWeight: FontWeight.w600,
             color: AudienceTheme.goldLight,
             letterSpacing: 2 * s,
@@ -704,24 +704,13 @@ class _FloatingPrizeChipState extends State<_FloatingPrizeChip>
 class _PrizeChipStatic extends StatelessWidget {
   final String hadiah;
   final double scale;
-
-  /// Ukuran font dasar (sebelum skala). Default 40 untuk chip biasa;
-  /// layar pemenang memakai 48 + bold agar hadiah terbaca sebagai
-  /// sub-headline, bukan teks pendamping.
-  final double fontSize;
-  final FontWeight fontWeight;
-  const _PrizeChipStatic(
-      {required this.hadiah,
-      this.scale = 1.0,
-      this.fontSize = 40,
-      this.fontWeight = FontWeight.w600});
+  const _PrizeChipStatic({required this.hadiah, this.scale = 1.0});
 
   @override
   Widget build(BuildContext context) {
     final s = scale;
     return Container(
-      padding: EdgeInsets.symmetric(
-          horizontal: fontSize * s, vertical: fontSize * 0.4 * s),
+      padding: EdgeInsets.symmetric(horizontal: 40 * s, vertical: 16 * s),
       decoration: BoxDecoration(
         border: Border.all(color: AudienceTheme.gold, width: 2),
         borderRadius: BorderRadius.circular(999),
@@ -730,10 +719,50 @@ class _PrizeChipStatic extends StatelessWidget {
       child: Text(
         hadiah,
         style: TextStyle(
-          fontSize: fontSize * s,
-          fontWeight: fontWeight,
+          fontSize: 40 * s,
+          fontWeight: FontWeight.w600,
           color: AudienceTheme.goldLight,
           letterSpacing: 2 * s,
+        ),
+      ),
+    );
+  }
+}
+
+/// Nama hadiah sebagai HEADLINE di layar pemenang: ikon piala + teks
+/// emas besar. Ini info utama pengumuman ("menang apa") — harus terbaca
+/// dari jauh, jadi diperlakukan setara judul, bukan chip pendamping.
+/// Nama panjang diskalakan turun (FittedBox) agar selalu muat dan tidak
+/// menabrak gambar kiri-kanan.
+class _WinnerPrizeLine extends StatelessWidget {
+  final String hadiah;
+  final double scale;
+  final double maxWidth;
+  const _WinnerPrizeLine(
+      {required this.hadiah, required this.scale, required this.maxWidth});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.emoji_events, size: 62 * s, color: AudienceTheme.gold),
+            SizedBox(width: 20 * s),
+            Text(
+              hadiah.toUpperCase(),
+              style: TextStyle(
+                fontSize: 76 * s,
+                fontWeight: FontWeight.w800,
+                color: AudienceTheme.goldLight,
+                letterSpacing: 2 * s,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1112,11 +1141,10 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                 FadeTransition(
                   opacity: CurvedAnimation(
                       parent: _reveal, curve: const Interval(0.35, 0.55)),
-                  child: _PrizeChipStatic(
+                  child: _WinnerPrizeLine(
                       hadiah: widget.hadiah,
                       scale: s,
-                      fontSize: 48,
-                      fontWeight: FontWeight.w700),
+                      maxWidth: (widget.adaGambar ? 1000 : 1300) * s),
                 ),
             ],
           ),
