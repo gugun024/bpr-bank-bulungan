@@ -18,10 +18,9 @@ import '../shared/theme.dart';
 /// Layout mengikuti mockup broadcast navy-emas yang disetujui Gugun
 /// (mockup-layout-broadcast-v3v4.html varian 4; layar pemenang imersif
 /// dari mockup-layout-gabungan.html): header brand + judul + badge
-/// LIVE, tiga kolom (panel hadiah | drum mesin undi | panel info),
-/// dan ticker pemenang terakhir di bawah. Stage pemenang dengan foto
-/// hadiah valid tampil imersif: foto memenuhi layar, panel info kaca
-/// melayang di kanan.
+/// LIVE, tiga kolom (panel hadiah | drum mesin undi | panel info).
+/// Stage pemenang dengan foto hadiah valid tampil imersif: foto
+/// memenuhi layar, panel info kaca melayang di kanan.
 ///
 /// Semua ukuran ditulis untuk kanvas 1920x1080 (mockup 960x540 ×2)
 /// lalu dikali faktor skala responsif [audienceScaleFor].
@@ -80,7 +79,6 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   String _prize = '';
   String _rejectedRekening = '';
   String _rejectedWaktu = '';
-  List<String> _ticker = [];
   String _rolling = '000000';
   Timer? _rollTimer;
   final _rand = Random();
@@ -151,13 +149,6 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
     } catch (_) {}
   }
 
-  /// Baca argumen ticker (daftar nomor kupon terformat) bila ada.
-  List<String>? _parseTicker(Map args) {
-    final t = args[AudienceProtocol.argTicker];
-    if (t is List) return t.map((e) => e.toString()).toList();
-    return null;
-  }
-
   Future<dynamic> _onMethod(MethodCall call) async {
     switch (call.method) {
       case AudienceProtocol.showIdle:
@@ -188,8 +179,6 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           _gambar = (args[AudienceProtocol.argGambar] ?? '').toString();
           _hadiah = (args[AudienceProtocol.argHadiah] ?? '').toString();
           _prize = _hadiah;
-          final t = _parseTicker(args);
-          if (t != null) _ticker = t;
           _stage = _Stage.winner;
         });
         break;
@@ -199,8 +188,6 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           _hadiah = (args[AudienceProtocol.argHadiah] ?? '').toString();
           _gambar = (args[AudienceProtocol.argGambar] ?? '').toString();
           _prize = _hadiah;
-          final t = _parseTicker(args);
-          if (t != null) _ticker = t;
           // Hadiah baru = undian sebelumnya selesai → kembali ke idle,
           // kecuali sedang mengocok (mode random).
           if (_stage != _Stage.shuffle) _stage = _Stage.idle;
@@ -299,14 +286,8 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
               left: 52 * s,
               right: 52 * s,
               top: 208 * s,
-              bottom: 128 * s,
+              bottom: 52 * s,
               child: _bodyZone(s, immersive),
-            ),
-            Positioned(
-              left: 52 * s,
-              right: 52 * s,
-              bottom: 32 * s,
-              child: _Ticker(scale: s, items: _ticker),
             ),
           ],
         ),
@@ -314,7 +295,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
     );
   }
 
-  /// Zona konten tiga kolom di antara header dan ticker.
+  /// Zona konten tiga kolom di bawah header.
   Widget _bodyZone(double s, bool immersive) {
     final prizePanel = _PrizePanel(scale: s, nama: _prize, gambar: _gambar);
     switch (_stage) {
@@ -750,80 +731,6 @@ class _LiveBadge extends StatelessWidget {
           letterSpacing: 1 * s,
           color: Colors.white,
         ),
-      ),
-    );
-  }
-}
-
-/// Ticker bawah: label "PEMENANG TERAKHIR" + maks 8 chip nomor kupon
-/// pemenang terakhir. Kosong → teks sambutan satu baris.
-class _Ticker extends StatelessWidget {
-  final double scale;
-  final List<String> items;
-  const _Ticker({required this.scale, required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    final s = scale;
-    return Container(
-      height: 76 * s,
-      padding: EdgeInsets.symmetric(horizontal: 24 * s),
-      decoration: BoxDecoration(
-        color: const Color(0xB3060C1F),
-        border: Border.all(color: const Color(0x8CD4AF37), width: 1.5 * s),
-        borderRadius: BorderRadius.circular(18 * s),
-      ),
-      child: Row(
-        children: [
-          Text(
-            'PEMENANG\nTERAKHIR',
-            style: TextStyle(
-              fontSize: 23 * s,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1 * s,
-              height: 1.15,
-              color: _Bc.goldLight,
-            ),
-          ),
-          SizedBox(width: 16 * s),
-          if (items.isEmpty)
-            Expanded(
-              child: Text(
-                'SELAMAT DATANG DI PENGUNDIAN HADIAH NASABAH SETIA '
-                'BANK BULUNGAN',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 24 * s,
-                  letterSpacing: 2 * s,
-                  color: _Bc.muted,
-                ),
-              ),
-            )
-          else
-            for (final n in items.take(8))
-              Expanded(
-                child: Container(
-                  margin: EdgeInsets.symmetric(horizontal: 4 * s),
-                  padding: EdgeInsets.symmetric(vertical: 6 * s),
-                  decoration: BoxDecoration(
-                    color: const Color(0xD91A3268),
-                    border: Border.all(
-                        color: const Color(0x73D4AF37), width: 1 * s),
-                    borderRadius: BorderRadius.circular(12 * s),
-                  ),
-                  child: Text(
-                    n,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 27 * s,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1 * s,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-        ],
       ),
     );
   }
@@ -1638,8 +1545,9 @@ class _WinnerRevealState extends State<_WinnerReveal>
                   info,
                 ],
               ),
-            // Confetti menutupi zona konten (dipertahankan dari
-            // tampilan lama; mulai setelah nomor mengunci).
+            // Confetti menutupi zona konten penuh di bawah header
+            // (dipertahankan dari tampilan lama; mulai setelah nomor
+            // mengunci).
             Positioned.fill(
               child: CustomPaint(painter: _ConfettiPainter(_reveal, _pieces)),
             ),

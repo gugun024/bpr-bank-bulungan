@@ -7,7 +7,6 @@ import '../../shared/protocol.dart';
 import '../../shared/sounds.dart';
 import '../../shared/theme.dart';
 import '../widgets/ui_kit.dart';
-import '../winner_ticker.dart';
 
 /// Tab undian random (berbobot): kocok → konfirmasi → tampilkan.
 class RandomTab extends StatefulWidget {
@@ -101,14 +100,11 @@ class _RandomTabState extends State<RandomTab> {
     }
   }
 
-  /// Kirim showPrize lengkap dengan ticker pemenang terakhir, agar
-  /// jendela penonton yang baru dibuka langsung sinkron.
+  /// Umumkan hadiah yang dipilih ke layar penonton (showPrize).
   Future<void> _announcePrize(Prize p) async {
-    final ticker = await buildWinnerTicker(DatabaseHelper.instance);
     await AudienceChannel.send(AudienceProtocol.showPrize, {
       AudienceProtocol.argHadiah: p.name,
       AudienceProtocol.argGambar: p.imagePath,
-      AudienceProtocol.argTicker: ticker,
     });
   }
 
@@ -158,9 +154,6 @@ class _RandomTabState extends State<RandomTab> {
         prizeId: prize.id!,
         mode: 'random',
       );
-      // Ticker dibangun SETELAH pemenang tercatat agar nomor barusan
-      // ikut tampil sebagai pemenang terakhir di layar penonton.
-      final ticker = await buildWinnerTicker(DatabaseHelper.instance);
       await AudienceChannel.send(AudienceProtocol.showWinner, {
         AudienceProtocol.argCoupon:
             Account.formatCoupon(drawn.couponNo, _couponWidth),
@@ -168,7 +161,6 @@ class _RandomTabState extends State<RandomTab> {
         AudienceProtocol.argAlamat: drawn.account.alamat,
         AudienceProtocol.argGambar: prize.imagePath,
         AudienceProtocol.argHadiah: prize.name,
-        AudienceProtocol.argTicker: ticker,
       });
       // Kocokan berhenti, ganti urutan reveal (tick melambat + fanfare).
       Sounds.stopShuffleTicks();

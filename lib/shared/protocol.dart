@@ -11,18 +11,14 @@ class AudienceProtocol {
   static const String stopShuffle = 'stopShuffle';
 
   /// args: {coupon: String, nama: String, alamat: String, hadiah: String,
-  ///         gambar: String, ticker: List<String>}
+  ///         gambar: String}
   /// alamat ditampilkan di kartu nama pemenang (pembedaan nama yang sama);
   /// boleh kosong — baris alamat disembunyikan.
   /// gambar = path file gambar hadiah ('' = tanpa gambar).
-  /// ticker = nomor kupon pemenang terakhir (terbaru dulu, maks 8)
-  /// untuk bar "PEMENANG TERAKHIR" di bawah layar penonton.
   static const String showWinner = 'showWinner';
 
-  /// args: {hadiah: String, gambar: String, ticker: List<String>} —
-  /// tampilkan hadiah yang sedang diundi (gambar boleh kosong).
-  /// ticker dikirim agar jendela penonton yang baru dibuka langsung
-  /// sinkron dengan riwayat pemenang sesi ini.
+  /// args: {hadiah: String, gambar: String} — tampilkan hadiah yang
+  /// sedang diundi (gambar boleh kosong).
   static const String showPrize = 'showPrize';
 
   /// operator → penonton: tampilkan info penolakan
@@ -60,7 +56,6 @@ class AudienceProtocol {
   static const String argRekening = 'rekening';
   static const String argWaktu = 'waktu';
   static const String argDetail = 'detail';
-  static const String argTicker = 'ticker';
 }
 
 /// Pengirim perintah ke window penonton (dipakai window operator).
