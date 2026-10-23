@@ -452,7 +452,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         child: Text(
           hadiah,
           style: TextStyle(
-            fontSize: 32 * s,
+            fontSize: 40 * s,
             fontWeight: FontWeight.w600,
             color: AudienceTheme.goldLight,
             letterSpacing: 2 * s,
@@ -683,13 +683,24 @@ class _FloatingPrizeChipState extends State<_FloatingPrizeChip>
 class _PrizeChipStatic extends StatelessWidget {
   final String hadiah;
   final double scale;
-  const _PrizeChipStatic({required this.hadiah, this.scale = 1.0});
+
+  /// Ukuran font dasar (sebelum skala). Default 40 untuk chip biasa;
+  /// layar pemenang memakai 48 + bold agar hadiah terbaca sebagai
+  /// sub-headline, bukan teks pendamping.
+  final double fontSize;
+  final FontWeight fontWeight;
+  const _PrizeChipStatic(
+      {required this.hadiah,
+      this.scale = 1.0,
+      this.fontSize = 40,
+      this.fontWeight = FontWeight.w600});
 
   @override
   Widget build(BuildContext context) {
     final s = scale;
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 40 * s, vertical: 16 * s),
+      padding: EdgeInsets.symmetric(
+          horizontal: fontSize * s, vertical: fontSize * 0.4 * s),
       decoration: BoxDecoration(
         border: Border.all(color: AudienceTheme.gold, width: 2),
         borderRadius: BorderRadius.circular(999),
@@ -698,8 +709,8 @@ class _PrizeChipStatic extends StatelessWidget {
       child: Text(
         hadiah,
         style: TextStyle(
-          fontSize: 32 * s,
-          fontWeight: FontWeight.w600,
+          fontSize: fontSize * s,
+          fontWeight: fontWeight,
           color: AudienceTheme.goldLight,
           letterSpacing: 2 * s,
         ),
@@ -984,7 +995,11 @@ class _AnimatedWinnerViewState extends State<_AnimatedWinnerView>
                 FadeTransition(
                   opacity: CurvedAnimation(
                       parent: _reveal, curve: const Interval(0.35, 0.55)),
-                  child: _PrizeChipStatic(hadiah: widget.hadiah, scale: s),
+                  child: _PrizeChipStatic(
+                      hadiah: widget.hadiah,
+                      scale: s,
+                      fontSize: 48,
+                      fontWeight: FontWeight.w700),
                 ),
             ],
           ),
