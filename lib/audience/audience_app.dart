@@ -1143,9 +1143,9 @@ class _WinnerRevealState extends State<_WinnerReveal>
         _reveal.forward();
       }
     });
-    // Catatan: tick slot TIDAK diputar dari window ini — window operator
-    // memutarnya dengan pola yang sama (Sounds.playReveal: easeOutQuart
-    // 2,6 dtk, 44 frame, lalu fanfare).
+    // Catatan: roll berjalan SENYAP total — window operator hanya
+    // menjadwalkan fanfare di ujung roll ini (Sounds.playReveal,
+    // 2,6 dtk), tanpa tick sama sekali.
     _pieces = List.generate(90, (_) => _Confetti.random(_rand));
     _roll.forward();
   }

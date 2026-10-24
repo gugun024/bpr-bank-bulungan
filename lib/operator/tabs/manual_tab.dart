@@ -203,8 +203,8 @@ class _ManualTabState extends State<ManualTab> {
         AudienceProtocol.argGambar: prize.imagePath,
         AudienceProtocol.argHadiah: prize.name,
       });
-      // Suara reveal (tick melambat 2,6 dtk + fanfare) diputar dari
-      // window operator — sinkron dengan animasi slot di penonton.
+      // Suara reveal diputar dari window operator: senyap selama
+      // roll penonton, fanfare tepat saat nomor mengunci.
       Sounds.playReveal();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

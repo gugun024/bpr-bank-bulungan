@@ -18,10 +18,12 @@ typedef _PlaySoundDart = int Function(
     ffi.Pointer<ffi.Void> hmod,
     int fdwSound);
 
-/// Efek suara undian: tick melambat selama urutan reveal & fanfare
-/// saat pemenang dikunci. Kocokan/roll berjalan SENYAP — tidak ada
-/// suara tick selama penonton ng-roll; suara hanya bunyi pada momen
-/// reveal pemenang ([playReveal]).
+/// Efek suara undian: FANFARE SAJA. Roll/kocokan dalam keadaan apa
+/// pun SENYAP total — tidak ada suara tick sama sekali, termasuk
+/// selama roll reveal. Satu-satunya suara acara adalah fanfare tepat
+/// saat nomor pemenang mengunci di layar penonton ([playReveal]
+/// menjadwalkannya di ujung roll visual 2,6 detik), plus putar manual
+/// dari tombol Tes Suara ([fanfare]).
 ///
 /// PEMUTARAN dilakukan dari window OPERATOR (engine utama). Alasan:
 /// plugin audioplayers terbukti tidak bunyi di sub-window penonton
@@ -31,13 +33,11 @@ typedef _PlaySoundDart = int Function(
 ///
 /// DUA JALUR PUTAR di Windows:
 /// 1. Utama: plugin audioplayers (mode mediaPlayer) — untuk fanfare.
-/// 2. Cadangan + KHUSUS TICK: API Windows langsung (winmm PlaySound
-///    via FFI) — tidak tergantung plugin / Media Foundation sama
-///    sekali. Dipakai OTOMATIS bila jalur utama gagal, dan tick
-///    SELALU lewat sini di Windows karena AudioPool mediaPlayer
-///    punya latency/antrean (tick masih keluar lama setelah urutan
-///    reveal selesai). PlaySound tanpa antrean: bunyi baru memotong
-///    bunyi sebelumnya, berhenti ya langsung senyap.
+/// 2. Cadangan: API Windows langsung (winmm PlaySound via FFI) —
+///    tidak tergantung plugin / Media Foundation sama sekali.
+///    Dipakai OTOMATIS bila jalur utama gagal. PlaySound tanpa
+///    antrean: bunyi baru memotong bunyi sebelumnya, berhenti ya
+///    langsung senyap — dipakai juga untuk memotong fanfare.
 ///    Kegagalan jalur utama DILAPORKAN lewat [onError] +
 ///    [initMessage] agar terlihat di layar operator.
 ///
@@ -46,12 +46,17 @@ typedef _PlaySoundDart = int Function(
 class Sounds {
   Sounds._();
 
+  /// Durasi roll visual penonton (slot roll di audience_app.dart —
+  /// AnimationController 2600ms). [playReveal] menjadwalkan fanfare
+  /// tepat di ujung durasi ini, saat nomor pemenang mengunci.
+  static const Duration revealRollDuration = Duration(milliseconds: 2600);
+
   static AudioPool? _tickPool;
   static final AudioPlayer _fanfarePlayer = AudioPlayer();
   static bool _muted = false;
   static bool _poolFailed = false;
   static Object? _poolError;
-  static Timer? _revealTimer;
+  static Timer? _revealFanfareTimer;
 
   // --- Jalur cadangan winmm ---
   static bool _fallbackActive = false;
@@ -83,8 +88,14 @@ class Sounds {
 
   static void setMuted(bool v) {
     _muted = v;
-    // Potong bunyi yang sedang jalan di jalur cadangan.
-    if (v && _fallbackActive) _playWinmm(null);
+    if (v) {
+      // Fanfare reveal yang masih tertunda ikut dibatalkan — operator
+      // membisukan berarti reveal ini tidak boleh bunyi sama sekali.
+      _revealFanfareTimer?.cancel();
+      _revealFanfareTimer = null;
+      // Potong bunyi yang sedang jalan di jalur cadangan.
+      if (_fallbackActive) _playWinmm(null);
+    }
   }
 
   static bool get muted => _muted;
@@ -94,8 +105,8 @@ class Sounds {
   /// Mengembalikan pesan (notice/error) atau null bila jalur utama sehat;
   /// pesan yang sama tersedia di [initMessage].
   static Future<String?> warmUp() async {
-    // Di Windows siapkan selalu file WAV winmm: jalur tick memang
-    // lewat sana (lihat tick()), dan sekalian siap sebagai cadangan.
+    // Di Windows siapkan selalu file WAV winmm sebagai cadangan
+    // fanfare (lihat fanfare()).
     if (Platform.isWindows) await _prepareWinmm();
     final err = await _probePrimary();
     if (err == null) {
@@ -175,33 +186,9 @@ class Sounds {
     return false;
   }
 
-  /// Tick pendek — dipakai pola reveal ([playReveal]) tiap frame
-  /// slot. Tidak perlu di-await oleh pemanggil.
-  static Future<void> tick() async {
-    if (_muted) return;
-    // Windows: tick selalu via winmm (latency nol, tanpa antrean) —
-    // sinkron persis dengan animasi slot di layar penonton.
-    if (Platform.isWindows && _tickPath != null) {
-      _playWinmm(_tickPath);
-      return;
-    }
-    if (_fallbackActive) {
-      _playWinmm(_tickPath);
-      return;
-    }
-    try {
-      await _ensureTickPool();
-      if (_poolFailed) throw StateError('pool: $_poolError');
-      await _tickPool?.start(volume: 0.6);
-    } catch (e) {
-      debugPrint('[Sounds] tick gagal: $e');
-      onError?.call('tick', e);
-      // Sembuhkan diri: pindah ke jalur cadangan lalu putar di sana.
-      if (await _activateFallback()) _playWinmm(_tickPath);
-    }
-  }
-
-  /// Fanfare kemenangan — dipanggil sekali saat nomor dikunci.
+  /// Fanfare kemenangan — SATU-SATUNYA suara acara. Diputar oleh
+  /// [playReveal] tepat saat nomor mengunci, dan langsung (instan)
+  /// oleh tombol Tes Suara di operator.
   static Future<void> fanfare() async {
     if (_muted) return;
     if (_fallbackActive) {
@@ -219,36 +206,28 @@ class Sounds {
 
   // ---------- Pola putar untuk window operator ----------
 
-  /// Urutan suara reveal pemenang, meniru layar penonton: tick slot
-  /// 2,6 detik yang melambat (easeOutQuart, 44 frame) lalu fanfare
-  /// tepat saat nomor mengunci.
+  /// Urutan suara reveal pemenang: SENYAP total selama roll visual
+  /// penonton ([revealRollDuration]), lalu fanfare tepat saat nomor
+  /// mengunci. Tidak ada tick dalam bentuk apa pun.
   static void playReveal() {
     stopReveal();
-    final sw = Stopwatch()..start();
-    var lastIdx = -1;
-    _revealTimer = Timer.periodic(const Duration(milliseconds: 16), (t) {
-      final ms = sw.elapsedMilliseconds;
-      if (ms >= 2600) {
-        t.cancel();
-        _revealTimer = null;
-        fanfare();
-        return;
-      }
-      // easeOutQuart: 1 - (1-x)^4
-      final x = (ms / 2600).clamp(0.0, 1.0);
-      final p = 1 - (1 - x) * (1 - x) * (1 - x) * (1 - x);
-      final idx = (p * 44).floor();
-      if (idx != lastIdx) {
-        lastIdx = idx;
-        tick();
-      }
+    _revealFanfareTimer = Timer(revealRollDuration, () {
+      _revealFanfareTimer = null;
+      // Operator bisa membisukan selagi fanfare tertunda; setMuted
+      // juga membatalkan timer ini — cek di sini sebagai pengaman.
+      if (_muted) return;
+      fanfare();
     });
   }
 
+  /// Batalkan fanfare reveal yang masih tertunda DAN potong fanfare
+  /// yang sedang bunyi di kedua jalur.
   static void stopReveal() {
-    _revealTimer?.cancel();
-    _revealTimer = null;
-    // Potong tick yang sedang berbunyi agar berhenti seketika.
+    _revealFanfareTimer?.cancel();
+    _revealFanfareTimer = null;
+    // Potong fanfare jalur utama yang sedang bunyi.
+    _fanfarePlayer.stop().catchError((_) => null);
+    // Potong bunyi yang sedang jalan di jalur cadangan.
     if (Platform.isWindows) _playWinmm(null);
   }
 
@@ -291,7 +270,7 @@ class Sounds {
 
   /// Putar file WAV lewat API Windows PlaySoundW (async). Path null =
   /// hentikan bunyi yang sedang jalan. PlaySound satu kanal: bunyi
-  /// baru memotong bunyi sebelumnya — pas untuk pola tick & fanfare.
+  /// baru memotong bunyi sebelumnya — pas untuk fanfare cadangan.
   static bool _playWinmm(String? path) {
     try {
       _winmmLib ??= ffi.DynamicLibrary.open('winmm.dll');
