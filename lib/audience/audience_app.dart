@@ -18,7 +18,7 @@ import '../shared/theme.dart';
 /// Layout mengikuti mockup SATU GAYA IMERSIF yang disetujui Gugun
 /// (mockup-layout-satu-gaya.html): panggung yang sama untuk SEMUA
 /// stage — latar foto hadiah memenuhi layar (atau latar navy-emas
-/// bila tanpa foto), header brand + judul + badge LIVE, panel info
+/// bila tanpa foto), header brand + judul, panel info
 /// kaca di kanan, dan blok teks di kiri bawah. Hanya isi blok & panel
 /// yang berganti mengikuti stage; komposisinya tidak pernah berubah.
 ///
@@ -60,7 +60,6 @@ class _Bc {
   static const Color onGoldDim = Color(0xFF7A5E10);
   static const Color muted = Color(0xFFC6CEDE);
   static const Color tagline = Color(0xFFD7E7FF);
-  static const Color liveRed = Color(0xFFE53935);
   static const Color amber = Color(0xFFF59E0B);
   static const Color amberLight = Color(0xFFFCD34D);
 }
@@ -275,11 +274,6 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
               child: _Header(scale: s, dark: hasPhoto),
             ),
             Positioned(
-              top: 36 * s,
-              right: 44 * s,
-              child: _LiveBadge(scale: s),
-            ),
-            Positioned(
               left: 52 * s,
               right: 52 * s,
               top: 208 * s,
@@ -324,14 +318,12 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
       case _Stage.idle:
         return _InfoPanel(
           scale: s,
-          chipText: 'PENGUNDIAN HADIAH',
           numText: '— — — — — —',
           mode: _InfoMode.menunggu,
         );
       case _Stage.shuffle:
         return _InfoPanel(
           scale: s,
-          chipText: 'SEDANG DIUNDI',
           numLabel: 'NOMOR KUPON',
           numText: _rolling,
           mode: _InfoMode.menunggu,
@@ -340,7 +332,6 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
       case _Stage.rejected:
         return _InfoPanel(
           scale: s,
-          chipText: 'PENGUNDIAN HADIAH',
           numText: _coupon,
           mode: _InfoMode.rejected,
           nama: _nama,
@@ -349,7 +340,6 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
       case _Stage.notFound:
         return _InfoPanel(
           scale: s,
-          chipText: 'PENGUNDIAN HADIAH',
           numText: _coupon,
           mode: _InfoMode.notFound,
         );
@@ -770,89 +760,52 @@ class _Header extends StatelessWidget {
           ],
         ),
         const Spacer(),
-        // Digeser kiri 148 untuk memberi ruang badge LIVE di pojok.
-        Padding(
-          padding: EdgeInsets.only(right: 148 * s),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'PENGUNDIAN HADIAH',
-                style: TextStyle(
-                  fontSize: 42 * s,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1 * s,
-                  color: Colors.white,
-                  shadows: dark
-                      ? [
-                          Shadow(
-                            color: const Color(0x66000000),
-                            blurRadius: 10 * s,
-                            offset: Offset(0, 2 * s),
-                          ),
-                        ]
-                      : null,
-                ),
+        // Judul acara rata kanan penuh, segaris dengan tepi kanan
+        // panel info di bawahnya.
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'PENGUNDIAN HADIAH',
+              style: TextStyle(
+                fontSize: 42 * s,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1 * s,
+                color: Colors.white,
+                shadows: dark
+                    ? [
+                        Shadow(
+                          color: const Color(0x66000000),
+                          blurRadius: 10 * s,
+                          offset: Offset(0, 2 * s),
+                        ),
+                      ]
+                    : null,
               ),
-              Text(
-                'Nasabah Setia Bank Bulungan',
-                style: TextStyle(
-                  fontSize: 31 * s,
-                  fontWeight: FontWeight.bold,
-                  color: _Bc.goldLight,
-                ),
+            ),
+            Text(
+              'Nasabah Setia Bank Bulungan',
+              style: TextStyle(
+                fontSize: 31 * s,
+                fontWeight: FontWeight.bold,
+                color: _Bc.goldLight,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
-/// Badge merah ● LIVE di pojok kanan atas.
-class _LiveBadge extends StatelessWidget {
-  final double scale;
-  const _LiveBadge({required this.scale});
-
-  @override
-  Widget build(BuildContext context) {
-    final s = scale;
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 24 * s, vertical: 10 * s),
-      decoration: BoxDecoration(
-        color: _Bc.liveRed,
-        borderRadius: BorderRadius.circular(14 * s),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0x80E53935),
-            blurRadius: 24 * s,
-            offset: Offset(0, 8 * s),
-          ),
-        ],
-      ),
-      child: Text(
-        '● LIVE',
-        style: TextStyle(
-          fontSize: 25 * s,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1 * s,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-}
-
 enum _InfoMode { menunggu, winner, rejected, notFound }
 
-/// Panel info kaca (kanan, selalu ada di semua stage): chip label,
-/// numbox emas, bar PEMENANG, kotak pemenang, dan teks penutup di
-/// bawah.
+/// Panel info kaca (kanan, selalu ada di semua stage): numbox emas,
+/// bar PEMENANG, kotak pemenang, dan teks script pemenang di bawah
+/// (khusus stage winner; stage lain berakhir setelah kotak pemenang).
 class _InfoPanel extends StatelessWidget {
   final double scale;
-  final String chipText;
   final String numLabel;
   final String numText;
   final String waitingText;
@@ -869,7 +822,6 @@ class _InfoPanel extends StatelessWidget {
 
   const _InfoPanel({
     required this.scale,
-    required this.chipText,
     required this.numText,
     required this.mode,
     this.numLabel = 'NOMOR KUPON PEMENANG',
@@ -898,28 +850,9 @@ class _InfoPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              padding:
-                  EdgeInsets.symmetric(horizontal: 24 * s, vertical: 8 * s),
-              decoration: BoxDecoration(
-                color: AudienceTheme.navy700,
-                border: Border.all(
-                    color: const Color(0x80D4AF37), width: 1 * s),
-                borderRadius: BorderRadius.circular(12 * s),
-              ),
-              child: Text(
-                chipText,
-                style: TextStyle(
-                  fontSize: 22 * s,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5 * s,
-                  color: _Bc.goldLight,
-                ),
-              ),
-            ),
-          ),
+          // Numbox adalah elemen pertama panel; jarak 20 dari tepi
+          // atas panel mengikuti margin-top numbox pada mockup
+          // bersih (10px pada skala mockup ×2).
           SizedBox(height: 20 * s),
           // Numbox: label kecil DI DALAM kotak, di atas angka.
           Container(
@@ -1146,15 +1079,9 @@ class _InfoPanel extends StatelessWidget {
         ),
       );
     }
-    return Text(
-      'Nasabah Setia Bank Bulungan',
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        fontSize: 24 * s,
-        fontStyle: FontStyle.italic,
-        color: _Bc.muted,
-      ),
-    );
+    // Stage non-winner: panel berakhir setelah kotak pemenang —
+    // tidak ada teks pengisi di bagian bawah (mockup bersih).
+    return const SizedBox.shrink();
   }
 }
 
@@ -1250,7 +1177,6 @@ class _WinnerRevealState extends State<_WinnerReveal>
         final display = _locked ? widget.coupon : _rollNumber(tick);
         final info = _InfoPanel(
           scale: s,
-          chipText: 'PENGUNDIAN HADIAH',
           numText: display,
           mode: _InfoMode.winner,
           nama: widget.nama,
