@@ -36,14 +36,6 @@ class _RandomTabState extends State<RandomTab> {
     _refresh();
   }
 
-  @override
-  void dispose() {
-    // Tab dibuang dari tree saat pindah halaman — pastikan tick kocokan
-    // tidak menggantung menyala.
-    Sounds.stopShuffleTicks();
-    super.dispose();
-  }
-
   int _left(Prize p) => _remaining[p.id] ?? p.qty;
 
   Future<void> _refresh() async {
@@ -119,17 +111,15 @@ class _RandomTabState extends State<RandomTab> {
         AudienceProtocol.argHadiah: _prize!.name,
         AudienceProtocol.argGambar: _prize!.imagePath,
       });
-      // Tick kocokan diputar dari window operator selama penonton
-      // ng-roll; berhenti saat Konfirmasi / Batal / pool kosong.
-      Sounds.startShuffleTicks();
-      // Hasil langsung dihitung & ditampilkan ke operator; layar penonton
-      // TERUS ng-roll tanpa henti sampai operator Konfirmasi / Batalkan.
+      // Kocokan berjalan SENYAP — suara baru bunyi saat pemenang
+      // dikonfirmasi (playReveal). Hasil langsung dihitung & ditampilkan
+      // ke operator; layar penonton TERUS ng-roll tanpa henti sampai
+      // operator Konfirmasi / Batalkan.
       // (Tidak ada stopShuffle di tengah — penonton tidak boleh melihat
       // nomor beku yang bukan hasil asli.)
       final res = await _svc.drawRandom();
       if (!mounted) return;
       if (res == null) {
-        Sounds.stopShuffleTicks();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Pool kosong — semua sudah menang.')),
         );
@@ -162,8 +152,7 @@ class _RandomTabState extends State<RandomTab> {
         AudienceProtocol.argGambar: prize.imagePath,
         AudienceProtocol.argHadiah: prize.name,
       });
-      // Kocokan berhenti, ganti urutan reveal (tick melambat + fanfare).
-      Sounds.stopShuffleTicks();
+      // Kocokan berhenti; putar urutan reveal pemenang.
       Sounds.playReveal();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -186,7 +175,6 @@ class _RandomTabState extends State<RandomTab> {
   }
 
   void _cancel() {
-    Sounds.stopShuffleTicks();
     setState(() => _drawn = null);
     AudienceChannel.send(AudienceProtocol.showIdle);
   }

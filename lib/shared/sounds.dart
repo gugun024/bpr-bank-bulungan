@@ -18,7 +18,10 @@ typedef _PlaySoundDart = int Function(
     ffi.Pointer<ffi.Void> hmod,
     int fdwSound);
 
-/// Efek suara undian: tick saat mengocok & fanfare saat pemenang dikunci.
+/// Efek suara undian: tick melambat selama urutan reveal & fanfare
+/// saat pemenang dikunci. Kocokan/roll berjalan SENYAP — tidak ada
+/// suara tick selama penonton ng-roll; suara hanya bunyi pada momen
+/// reveal pemenang ([playReveal]).
 ///
 /// PEMUTARAN dilakukan dari window OPERATOR (engine utama). Alasan:
 /// plugin audioplayers terbukti tidak bunyi di sub-window penonton
@@ -48,7 +51,6 @@ class Sounds {
   static bool _muted = false;
   static bool _poolFailed = false;
   static Object? _poolError;
-  static Timer? _shuffleTimer;
   static Timer? _revealTimer;
 
   // --- Jalur cadangan winmm ---
@@ -173,8 +175,8 @@ class Sounds {
     return false;
   }
 
-  /// Tick pendek — panggil tiap frame roll kocokan / slot.
-  /// Tidak perlu di-await oleh pemanggil.
+  /// Tick pendek — dipakai pola reveal ([playReveal]) tiap frame
+  /// slot. Tidak perlu di-await oleh pemanggil.
   static Future<void> tick() async {
     if (_muted) return;
     // Windows: tick selalu via winmm (latency nol, tanpa antrean) —
@@ -216,21 +218,6 @@ class Sounds {
   }
 
   // ---------- Pola putar untuk window operator ----------
-
-  /// Tick berulang selama layar penonton ng-roll tanpa henti
-  /// (mode random, sebelum Konfirmasi/Batal).
-  static void startShuffleTicks() {
-    stopShuffleTicks();
-    _shuffleTimer =
-        Timer.periodic(const Duration(milliseconds: 70), (_) => tick());
-  }
-
-  static void stopShuffleTicks() {
-    _shuffleTimer?.cancel();
-    _shuffleTimer = null;
-    // Potong tick yang sedang berbunyi agar berhenti seketika.
-    if (Platform.isWindows) _playWinmm(null);
-  }
 
   /// Urutan suara reveal pemenang, meniru layar penonton: tick slot
   /// 2,6 detik yang melambat (easeOutQuart, 44 frame) lalu fanfare

@@ -232,8 +232,9 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
         setState(() {
           _rolling = _rand.nextInt(1000000).toString().padLeft(6, '0');
         });
-        // Tick diputar oleh window operator (lihat Sounds.playReveal /
-        // startShuffleTicks) — bukan dari sub-window ini.
+        // Roll berjalan senyap; suara hanya pada reveal pemenang dan
+        // diputar oleh window operator (lihat Sounds.playReveal) —
+        // bukan dari sub-window ini.
       }
     });
   }
