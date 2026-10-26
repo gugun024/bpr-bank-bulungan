@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:flutter/material.dart';
@@ -16,11 +17,12 @@ import '../shared/theme.dart';
 /// Dikendalikan penuh dari window operator via WindowMethodChannel.
 ///
 /// Layout mengikuti mockup SATU GAYA IMERSIF yang disetujui Gugun
-/// (mockup-layout-satu-gaya.html): panggung yang sama untuk SEMUA
-/// stage — latar foto hadiah memenuhi layar (atau latar navy-emas
-/// bila tanpa foto), header brand + judul, panel info
-/// kaca di kanan, dan blok teks di kiri bawah. Hanya isi blok & panel
-/// yang berganti mengikuti stage; komposisinya tidak pernah berubah.
+/// (mockup-layout-satu-gaya.html) + sistem hadiah otomatis dari
+/// mockup-hadiah-final.html: panggung yang sama untuk SEMUA stage,
+/// dengan gambar hadiah yang dideteksi otomatis — file transparan
+/// (PNG cutout) tampil sebagai OBJEK di atas panggung navy-emas,
+/// sedangkan foto biasa (JPG/poster) menjadi LATAR penuh layar.
+/// Header selalu terang + scrim atas agar terbaca di foto apa pun.
 ///
 /// Semua ukuran ditulis untuk kanvas 1920x1080 (mockup 960x540 ×2)
 /// lalu dikali faktor skala responsif [audienceScaleFor].
@@ -80,6 +82,70 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   String _rolling = '000000';
   Timer? _rollTimer;
   final _rand = Random();
+
+  // --- Deteksi otomatis mode gambar hadiah ---
+  // File transparan (PNG cutout) -> objek di panggung; foto biasa ->
+  // latar penuh. Hasil dideteksi SEKALI per path (async, tidak blokir
+  // frame) dan di-cache; selama deteksi berjalan dipakai mode latar.
+  final Map<String, bool> _cutoutCache = {};
+  String? _detectingPath;
+  bool _isCutout = false;
+
+  void _updateImageMode(String path) {
+    if (path.isEmpty || !File(path).existsSync()) {
+      _detectingPath = null;
+      if (_isCutout) setState(() => _isCutout = false);
+      return;
+    }
+    final cached = _cutoutCache[path];
+    if (cached != null) {
+      _detectingPath = null;
+      if (_isCutout != cached) setState(() => _isCutout = cached);
+      return;
+    }
+    _detectingPath = path;
+    if (_isCutout) setState(() => _isCutout = false);
+    _detectTransparency(path).then((result) {
+      // Abaikan hasil usang: hanya terapkan bila path masih sama
+      // dengan yang sedang tampil & sedang dideteksi.
+      if (!mounted || _detectingPath != path || _gambar != path) return;
+      _cutoutCache[path] = result;
+      _detectingPath = null;
+      if (_isCutout != result) setState(() => _isCutout = result);
+    });
+  }
+
+  /// Dekode file gambar dan hitung fraksi piksel dengan alpha < 250.
+  /// Cutout bila fraksi > 1%. Yang menentukan adalah ISI alpha-nya,
+  /// bukan ekstensi file (PNG yang sepenuhnya opaque = latar).
+  Future<bool> _detectTransparency(String path) async {
+    try {
+      final bytes = await File(path).readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes);
+      try {
+        final frame = await codec.getNextFrame();
+        try {
+          final data = await frame.image
+              .toByteData(format: ui.ImageByteFormat.rawRgba);
+          if (data == null) return false;
+          final b = data.buffer
+              .asUint8List(data.offsetInBytes, data.lengthInBytes);
+          var transparent = 0;
+          final total = b.length ~/ 4;
+          for (var i = 3; i < b.length; i += 4) {
+            if (b[i] < 250) transparent++;
+          }
+          return total > 0 && transparent / total > 0.01;
+        } finally {
+          frame.image.dispose();
+        }
+      } finally {
+        codec.dispose();
+      }
+    } catch (_) {
+      return false;
+    }
+  }
 
   static const _channel = WindowMethodChannel(
     AudienceProtocol.channelName,
@@ -162,6 +228,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           _gambar = (a[AudienceProtocol.argGambar] ?? '').toString();
           _prize = _hadiah;
         });
+        _updateImageMode(_gambar);
         _startRoll();
         break;
       case AudienceProtocol.stopShuffle:
@@ -179,6 +246,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           _prize = _hadiah;
           _stage = _Stage.winner;
         });
+        _updateImageMode(_gambar);
         break;
       case AudienceProtocol.showPrize:
         final args = (call.arguments as Map?) ?? {};
@@ -190,6 +258,7 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           // kecuali sedang mengocok (mode random).
           if (_stage != _Stage.shuffle) _stage = _Stage.idle;
         });
+        _updateImageMode(_gambar);
         break;
       case AudienceProtocol.showRejected:
         _stopRoll();
@@ -254,25 +323,40 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   @override
   Widget build(BuildContext context) {
     final s = audienceScale(context);
-    // SATU gaya imersif untuk semua stage: bila hadiah saat ini punya
-    // foto valid, foto itu menjadi latar panggung; selain itu latar
-    // navy-emas. Komposisi (header, panel kanan, blok kiri bawah)
-    // tidak pernah berubah — hanya isinya yang berganti.
+    // SATU gaya imersif untuk semua stage. Gambar hadiah yang
+    // terdeteksi transparan (cutout) menjadi objek di panggung;
+    // foto biasa menjadi latar penuh; tanpa foto = latar navy-emas.
+    // Komposisi (header, panel kanan, blok kiri bawah) tidak pernah
+    // berubah — hanya isinya yang berganti.
     final hasPhoto = _gambar.isNotEmpty && File(_gambar).existsSync();
+    final cutout = hasPhoto && _isCutout;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         body: Stack(
           children: [
-            if (hasPhoto)
+            if (cutout)
+              _CutoutStage(path: _gambar, scale: s)
+            else if (hasPhoto)
               _ImmersiveBackground(path: _gambar)
             else
               _BroadcastBackground(scale: s),
+            // Scrim atas: di atas latar/objek, di bawah panel & header
+            // (z-order mock final: scrim 3, panel 4, header 5).
             Positioned(
-              top: 40 * s,
-              left: 52 * s,
-              right: 52 * s,
-              child: _Header(scale: s, dark: hasPhoto),
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 260 * s,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x8C060C1F), Color(0x00060C1F)],
+                  ),
+                ),
+              ),
             ),
             Positioned(
               left: 52 * s,
@@ -280,6 +364,12 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
               top: 208 * s,
               bottom: 52 * s,
               child: _bodyZone(s),
+            ),
+            Positioned(
+              top: 40 * s,
+              left: 52 * s,
+              right: 52 * s,
+              child: _Header(scale: s),
             ),
           ],
         ),
@@ -541,10 +631,17 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
 
 /// Background panggung tanpa foto: gradient navy 150° + glow radial
 /// emas kanan-atas & kiri-bawah + watermark piala samar di kiri +
-/// gelombang emas sangat halus.
+/// gelombang emas sangat halus. Dipakai ulang oleh _CutoutStage
+/// (tanpa watermark, gelombang lebih nyata).
 class _BroadcastBackground extends StatelessWidget {
   final double scale;
-  const _BroadcastBackground({required this.scale});
+  final bool watermark;
+  final int? waveAlpha;
+  const _BroadcastBackground({
+    required this.scale,
+    this.watermark = true,
+    this.waveAlpha,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -573,16 +670,79 @@ class _BroadcastBackground extends StatelessWidget {
           child: _Blur(color: const Color(0x1AD4AF37), size: 720 * s),
         ),
         // Watermark piala samar di kiri (mockup satu-gaya layar 4).
-        Positioned(
-          left: 180 * s,
-          top: 300 * s,
-          child: Icon(
-            Icons.emoji_events,
-            size: 500 * s,
-            color: const Color(0x24D4AF37),
+        // Tidak dipakai di mode cutout (objek menempati area kiri).
+        if (watermark)
+          Positioned(
+            left: 180 * s,
+            top: 300 * s,
+            child: Icon(
+              Icons.emoji_events,
+              size: 500 * s,
+              color: const Color(0x24D4AF37),
+            ),
+          ),
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _WavesPainter(
+              alphaBottom: waveAlpha ?? 0x1F,
+              alphaTop: waveAlpha ?? 0x1A,
+            ),
           ),
         ),
-        const Positioned.fill(child: CustomPaint(painter: _WavesPainter())),
+      ],
+    );
+  }
+}
+
+/// Panggung mode cutout: latar navy-emas + gelombang emas 0x29 +
+/// spotlight putih di belakang objek + objek transparan (contain)
+/// di kiri-tengah. Tidak ada shade horizontal (panel kaca sudah
+/// cukup pekat) dan tidak ada watermark piala.
+class _CutoutStage extends StatelessWidget {
+  final String path;
+  final double scale;
+  const _CutoutStage({required this.path, required this.scale});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale;
+    final size = MediaQuery.sizeOf(context);
+    final sw = 960 * s;
+    final sh = 760 * s;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _BroadcastBackground(scale: s, watermark: false, waveAlpha: 0x29),
+        // Spotlight elips di belakang objek (pusat 32% lebar,
+        // 55% tinggi; putih alpha 0.20 memudar ke 0 di 65% radius).
+        Positioned(
+          left: size.width * 0.32 - sw / 2,
+          top: size.height * 0.55 - sh / 2,
+          child: Container(
+            width: sw,
+            height: sh,
+            decoration: BoxDecoration(
+              borderRadius:
+                  BorderRadius.all(Radius.elliptical(sw / 2, sh / 2)),
+              gradient: const RadialGradient(
+                colors: [Color(0x33FFFFFF), Color(0x00FFFFFF)],
+                stops: [0.0, 0.65],
+              ),
+            ),
+          ),
+        ),
+        // Objek: contain (utuh, tidak terpotong), kiri -20, atas 192,
+        // tinggi 800 — persis mockup-hadiah-final (960x540 ×2).
+        Positioned(
+          left: -20 * s,
+          top: 192 * s,
+          height: 800 * s,
+          child: Image.file(
+            File(path),
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          ),
+        ),
       ],
     );
   }
@@ -627,7 +787,9 @@ class _ImmersiveBackground extends StatelessWidget {
 /// Gelombang emas halus di atas & bawah layar, meniru path SVG
 /// mockup (kanvas 960x540, diskalakan proporsional ke ukuran layar).
 class _WavesPainter extends CustomPainter {
-  const _WavesPainter();
+  final int alphaBottom;
+  final int alphaTop;
+  const _WavesPainter({this.alphaBottom = 0x1F, this.alphaTop = 0x1A});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -643,7 +805,8 @@ class _WavesPainter extends CustomPainter {
       ..lineTo(x(960), y(540))
       ..lineTo(x(0), y(540))
       ..close();
-    canvas.drawPath(bottom, Paint()..color = const Color(0x1FD4AF37));
+    canvas.drawPath(
+        bottom, Paint()..color = Color(0xFFD4AF37).withAlpha(alphaBottom));
 
     final top = Path()
       ..moveTo(x(0), y(90))
@@ -652,7 +815,7 @@ class _WavesPainter extends CustomPainter {
       ..lineTo(x(960), y(0))
       ..lineTo(x(0), y(0))
       ..close();
-    canvas.drawPath(top, Paint()..color = const Color(0x1AD4AF37));
+    canvas.drawPath(top, Paint()..color = Color(0xFFD4AF37).withAlpha(alphaTop));
   }
 
   @override
@@ -679,13 +842,12 @@ class _Blur extends StatelessWidget {
 }
 
 /// Header semua layar: brand bank di kiri, judul acara di kanan.
-/// Di atas foto teks brand berwarna GELAP (sisi kiri foto pada
-/// mockup terang) dan judul diberi shadow — persis mockup satu-gaya;
-/// di atas latar navy teks brand terang.
+/// SELALU terang (PT emas, nama putih + shadow, tagline terang) —
+/// varian teks gelap dihapus: dengan scrim atas + header terang,
+/// header terbaca di latar foto apa pun (terang maupun gelap).
 class _Header extends StatelessWidget {
   final double scale;
-  final bool dark;
-  const _Header({required this.scale, required this.dark});
+  const _Header({required this.scale});
 
   @override
   Widget build(BuildContext context) {
@@ -737,7 +899,7 @@ class _Header extends StatelessWidget {
                 fontSize: 24 * s,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 2 * s,
-                color: dark ? const Color(0xFF0B3D91) : _Bc.goldLight,
+                color: _Bc.goldLight,
               ),
             ),
             Text(
@@ -747,7 +909,7 @@ class _Header extends StatelessWidget {
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.5 * s,
                 height: 1.05,
-                color: dark ? const Color(0xFF072A63) : Colors.white,
+                color: Colors.white,
               ),
             ),
             Text(
@@ -755,7 +917,7 @@ class _Header extends StatelessWidget {
               style: TextStyle(
                 fontSize: 23 * s,
                 fontStyle: FontStyle.italic,
-                color: dark ? const Color(0xFF31517F) : _Bc.tagline,
+                color: _Bc.tagline,
               ),
             ),
           ],
@@ -774,15 +936,13 @@ class _Header extends StatelessWidget {
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1 * s,
                 color: Colors.white,
-                shadows: dark
-                    ? [
-                        Shadow(
-                          color: const Color(0x66000000),
-                          blurRadius: 10 * s,
-                          offset: Offset(0, 2 * s),
-                        ),
-                      ]
-                    : null,
+                shadows: [
+                  Shadow(
+                    color: const Color(0x66000000),
+                    blurRadius: 10 * s,
+                    offset: Offset(0, 2 * s),
+                  ),
+                ],
               ),
             ),
             Text(
