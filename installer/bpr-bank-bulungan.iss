@@ -4,19 +4,19 @@
 ;   1. Langkah "Build installer" mengganti __APP_VERSION__ dengan versi
 ;      dari pubspec.yaml (bagian X.Y.Z, tanpa +build).
 ;   2. ISCC.exe meng-compile script ini -> installer-output\PT-BPR-Bank-Bulungan-Setup.exe
-;   3. File setup.exe dilampirkan ke GitHub Release berdampingan dengan .zip.
-;
+
+#define AppExe "BPR_Bank_Bulungan.exe"
+#define AppVersion "__APP_VERSION__"
+
 ; Instalasi per-pengguna (tanpa perlu hak admin): program terpasang di
 ; %LOCALAPPDATA%\Programs\PT. BPR Bank Bulungan, shortcut di Start Menu
 ; (+ opsional Desktop), dan uninstaller terdaftar di Settings > Apps.
 ; Data aplikasi (database, gambar hadiah) tetap di Documents seperti biasa
 ; karena aplikasi tidak menulis apa pun ke folder install-nya sendiri.
 
-#define AppExe "BPR_Bank_Bulungan.exe"
-
 [Setup]
 AppName=PT. BPR Bank Bulungan
-AppVersion=__APP_VERSION__
+AppVersion={#AppVersion}
 AppVerName=PT. BPR Bank Bulungan {#AppVersion}
 AppPublisher=PT. BPR Bank Bulungan
 AppPublisherURL=
