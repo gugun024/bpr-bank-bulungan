@@ -26,7 +26,7 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
-OutputDir=installer-output
+OutputDir={#SourcePath}\..\installer-output
 OutputBaseFilename=PT-BPR-Bank-Bulungan-Setup
 Compression=lzma2
 SolidCompression=yes
@@ -35,7 +35,9 @@ UninstallDisplayName=PT. BPR Bank Bulungan
 SetupMutex=PT-BPR-Bank-Bulungan-Setup
 
 [Languages]
-Name: "indonesian"; MessagesFile: "compiler:Languages\Indonesian.isl"
+; Bahasa wizard = Inggris (bawaan). Indonesian.isl tidak tersedia di
+; instalasi Inno Setup runner, jadi jangan pakai "indonesian" di sini.
+Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Buat shortcut di Desktop"; GroupDescription: "Shortcut tambahan:"; Flags: unchecked
