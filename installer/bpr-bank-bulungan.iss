@@ -46,7 +46,9 @@ Name: "desktopicon"; Description: "Buat shortcut di Desktop"; GroupDescription: 
 ; Seluruh hasil flutter build windows --release (exe + flutter_windows.dll
 ; + folder data/). Nama exe sudah diubah jadi BPR_Bank_Bulungan.exe oleh
 ; patch BINARY_NAME di workflow sebelum build.
-Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Path sumber juga relatif ke lokasi script, jadi pakai {#SourcePath}
+; (folder installer/) + naik satu level ke root repo.
+Source: "{#SourcePath}\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\PT. BPR Bank Bulungan"; Filename: "{app}\{#AppExe}"
