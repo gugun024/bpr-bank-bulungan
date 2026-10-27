@@ -20,6 +20,7 @@ on:
       - 'test/**'
       - 'pubspec.yaml'
       - 'pubspec.lock'
+      - 'installer/**'
       - '.github/workflows/**'
   workflow_dispatch:
     inputs:
@@ -176,11 +177,31 @@ jobs:
           Compress-Archive -Path "$out/*" -DestinationPath "PT-BPR-Bank-Bulungan-windows.zip" -Force
           Get-Item "PT-BPR-Bank-Bulungan-windows.zip" | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
 
+      - name: Build installer (Inno Setup)
+        # Hasilnya: installer-output/PT-BPR-Bank-Bulungan-Setup.exe
+        # (instalasi per-pengguna, tanpa perlu hak admin).
+        # Versi installer diambil dari pubspec.yaml (X.Y.Z, tanpa +build).
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          choco install innosetup --no-progress -y
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) { throw "ISCC tidak ditemukan: $iscc" }
+          $ver = (Select-String -Path "pubspec.yaml" -Pattern "^version:\s*(\d+\.\d+\.\d+)").Matches.Groups[1].Value
+          if (!$ver) { throw "Versi pubspec.yaml tidak ditemukan" }
+          (Get-Content "installer/bpr-bank-bulungan.iss" -Raw) -replace "__APP_VERSION__", $ver |
+            Set-Content "installer/bpr-bank-bulungan.iss" -NoNewline
+          Write-Host "AppVersion installer -> $ver"
+          & $iscc "installer/bpr-bank-bulungan.iss"
+          Get-Item "installer-output/PT-BPR-Bank-Bulungan-Setup.exe" | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: PT-BPR-Bank-Bulungan-windows
-          path: PT-BPR-Bank-Bulungan-windows.zip
+          path: |
+            PT-BPR-Bank-Bulungan-windows.zip
+            installer-output/PT-BPR-Bank-Bulungan-Setup.exe
           retention-days: 90
 
       - name: Buat GitHub Release
@@ -190,5 +211,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.bump.outputs.tag }}
-          files: PT-BPR-Bank-Bulungan-windows.zip
+          files: |
+            PT-BPR-Bank-Bulungan-windows.zip
+            installer-output/PT-BPR-Bank-Bulungan-Setup.exe
           generate_release_notes: true
