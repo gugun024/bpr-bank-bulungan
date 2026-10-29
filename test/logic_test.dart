@@ -12,6 +12,7 @@ import 'package:undian_bank/core/import_service.dart';
 import 'package:undian_bank/core/models.dart';
 import 'package:undian_bank/operator/tabs/data_tab.dart';
 import 'package:undian_bank/operator/tabs/history_tab.dart';
+import 'package:undian_bank/shared/display_target.dart';
 
 void main() {
   setUpAll(() {
@@ -749,6 +750,55 @@ void main() {
       await db.deleteAccounts([aids[0]]);
       expect((await db.getPrizes()).isEmpty, true);
       expect(await db.countAccounts(), 2);
+    });
+  });
+
+  group('pilih display target layar penonton', () {
+    test('TV di kanan (1920,0) -> display kedua', () {
+      expect(
+          pickDisplayTarget([Offset.zero, const Offset(1920, 0)]), 1);
+    });
+
+    test('TV di kiri (-1920,0) -> display kedua', () {
+      expect(
+          pickDisplayTarget([Offset.zero, const Offset(-1920, 0)]), 1);
+    });
+
+    test('TV jadi display utama: target = display non-utama (laptop)', () {
+      // TV di (0,0), laptop di (1920,0): menurut definisi "bukan utama",
+      // target = laptop (indeks 0). Ini perilaku yang JUJUR: laporan
+      // display ke operator menampilkan target + posisinya, jadi
+      // operator bisa melihatnya dan menukar display utama di Settings
+      // Windows bila ingin penonton mendarat di TV.
+      expect(
+          pickDisplayTarget([const Offset(1920, 0), Offset.zero]), 0);
+    });
+
+    test('mode Duplicate (semua (0,0)) -> indeks 1 bila ada', () {
+      expect(pickDisplayTarget([Offset.zero, Offset.zero]), 1);
+    });
+
+    test('satu display -> 0', () {
+      expect(pickDisplayTarget([Offset.zero]), 0);
+    });
+
+    test('list kosong -> null', () {
+      expect(pickDisplayTarget([]), null);
+    });
+
+    test('tiga display -> display non-utama pertama', () {
+      expect(
+          pickDisplayTarget([
+            Offset.zero,
+            const Offset(1920, 0),
+            const Offset(3840, 0),
+          ]),
+          1);
+    });
+
+    test('posisi null diperlakukan seperti (0,0)', () {
+      expect(pickDisplayTarget([Offset.zero, null]), 1);
+      expect(pickDisplayTarget([null, const Offset(1920, 0)]), 1);
     });
   });
 }

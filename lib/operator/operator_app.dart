@@ -26,6 +26,7 @@ class _OperatorAppState extends State<OperatorApp> {
   bool _audienceMuted = false;
   bool _openingAudience = false; // cegah klik ganda -> window dobel
   bool _audioErrorShown = false; // SnackBar error audio cukup sekali
+  String? _displayReport; // laporan display terakhir dari penonton
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
@@ -50,6 +51,20 @@ class _OperatorAppState extends State<OperatorApp> {
               content: Text(
                   'Diagnostik audio penonton: $detail\n'
                   '(Suara kini diputar dari window operator.)'),
+              duration: const Duration(seconds: 12),
+            ),
+          );
+        }
+      }
+      // Laporan display SELALU ditampilkan (SnackBar + teks persisten
+      // di AppBar): kegagalan pindah display tidak boleh bisu lagi.
+      if (method == AudienceProtocol.displayReport) {
+        final detail = (args?[AudienceProtocol.argDetail] ?? '').toString();
+        if (detail.isNotEmpty && mounted) {
+          setState(() => _displayReport = detail);
+          _messengerKey.currentState?.showSnackBar(
+            SnackBar(
+              content: Text('Layar penonton: $detail'),
               duration: const Duration(seconds: 12),
             ),
           );
@@ -212,6 +227,21 @@ class _OperatorAppState extends State<OperatorApp> {
           elevation: 0,
           shape: const Border(bottom: BorderSide(color: OpTheme.cardBorder)),
           actions: [
+            // Laporan display persisten (teks lengkap via tooltip).
+            if (_displayReport != null)
+              Container(
+                constraints: const BoxConstraints(maxWidth: 380),
+                alignment: Alignment.center,
+                child: Tooltip(
+                  message: _displayReport!,
+                  child: Text(
+                    _displayReport!,
+                    style: const TextStyle(
+                        fontSize: 11, color: OpTheme.textMuted),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
             _audienceOpen
                 ? Container(
                     margin: const EdgeInsets.symmetric(vertical: 10),

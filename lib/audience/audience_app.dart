@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../shared/display_target.dart';
 import '../shared/protocol.dart';
 import '../shared/sounds.dart';
 import '../shared/theme.dart';
@@ -177,25 +178,146 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   }
 
   Future<void> _goFullscreen() async {
+    // Diagnostik display: dikumpulkan selama usaha pindah, lalu dikirim
+    // SEKALI ke operator setelah usaha awal + retry selesai. Tidak ada
+    // lagi catch yang menelan kegagalan tanpa mencatat — pelajaran dari
+    // bug auto-pindah yang gagal bisu (Extend jalan, penonton tetap di
+    // laptop, tidak ada yang tahu langkah mana yang patah).
+    var displayCount = 0;
+    var targetIndex = -1;
+    Offset? targetPos;
+    Offset? currentPos;
+    var initialMoveOk = false;
+    var moved = false;
+    String? error;
+
+    String fmtPos(Offset? pos) =>
+        pos == null ? '?' : '(${pos.dx.toInt()},${pos.dy.toInt()})';
+
     try {
       await windowManager.ensureInitialized();
       await windowManager.setTitle('PT. BPR Bank Bulungan - Layar Penonton');
-      // Otomatis pindah ke monitor kedua (proyektor) bila ada;
-      // kalau cuma 1 monitor, tetap fullscreen di monitor utama.
+    } catch (e) {
+      error = 'window_manager: $e';
+    }
+
+    // 1) Baca daftar display + pilih target (display NON-UTAMA, dipilih
+    // dari posisi — bukan mentah displays[1] seperti sebelumnya).
+    List<Offset?> positions = const [];
+    try {
+      final displays = await screenRetriever.getAllDisplays();
+      displayCount = displays.length;
+      positions = displays.map((d) => d.visiblePosition).toList();
+      final target = pickDisplayTarget(positions);
+      if (target != null) {
+        targetIndex = target;
+        targetPos = positions[target];
+      }
+    } catch (e) {
+      error = 'baca display: $e';
+    }
+
+    // 2) Usaha awal: pindah (bila target diketahui) lalu fullscreen.
+    Future<bool> tryMove() async {
+      if (targetPos == null) return false;
       try {
-        final displays = await screenRetriever.getAllDisplays();
-        if (displays.length > 1) {
-          final pos = displays[1].visiblePosition;
-          if (pos != null) await windowManager.setPosition(pos);
+        await windowManager.setPosition(targetPos);
+        return true;
+      } catch (e) {
+        error = 'setPosition: $e';
+        return false;
+      }
+    }
+
+    try {
+      if (displayCount > 1) {
+        if (targetPos != null) {
+          initialMoveOk = await tryMove();
+        } else {
+          error ??= 'posisi target tidak diketahui';
         }
-      } catch (_) {}
+      } else if (displayCount == 1) {
+        // Satu display: tidak ada yang perlu dipindah.
+        moved = true;
+      }
       await windowManager.setFullScreen(true);
+    } catch (e) {
+      error = 'fullscreen: $e';
+    }
+    try {
       // Cegah window penonton tertutup tidak sengaja (mis. Alt+F4):
       // percobaan tutup diubah jadi sembunyikan saja (lihat onWindowClose).
       await windowManager.setPreventClose(true);
+    } catch (e) {
+      error ??= 'preventClose: $e';
+    }
+
+    // 3) Retry setelah window tampil: initState jalan SEBELUM
+    // controller.show() dari operator, jadi setPosition awal bisa
+    // diabaikan/ditimpa penempatan default Windows. Tunggu frame
+    // pertama + 600ms, baca posisi kini; bila belum di target, pindah
+    // lagi + fullscreen lagi, lalu verifikasi posisi akhirnya.
+    if (displayCount > 1 && targetPos != null) {
+      try {
+        await WidgetsBinding.instance.endOfFrame
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {
+        // Frame tak kunjung selesai: tetap lanjut ke delay + retry agar
+        // laporan tidak pernah hilang.
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (mounted) {
+        try {
+          currentPos = await windowManager.getPosition();
+          // targetPos sudah dipromosikan non-null oleh cabang luar
+          // (displayCount > 1 && targetPos != null).
+          if ((currentPos - targetPos).distance <= 8) {
+            moved = true;
+          } else {
+            if (await tryMove()) {
+              try {
+                await windowManager.setFullScreen(true);
+              } catch (e) {
+                error = 'fullscreen (retry): $e';
+              }
+              try {
+                currentPos = await windowManager.getPosition();
+                moved = (currentPos - targetPos).distance <= 8;
+              } catch (e) {
+                error = 'baca posisi (retry): $e';
+                moved = initialMoveOk;
+              }
+            }
+          }
+        } catch (e) {
+          error = 'retry: $e';
+          moved = initialMoveOk;
+        }
+      }
+    }
+
+    // 4) Laporan SEKALI ke operator (gabungan usaha awal + retry).
+    if (!mounted) return;
+    final targetLabel =
+        targetIndex < 0 ? '?' : '${targetIndex + 1} @ ${fmtPos(targetPos)}';
+    var report = 'Display: $displayCount, target: $targetLabel, ';
+    if (displayCount == 1) {
+      report += 'pindah: tidak perlu (satu display)';
+    } else if (displayCount == 0) {
+      report += 'pindah: TIDAK (display tidak terbaca)';
+    } else if (moved) {
+      report += 'pindah: ya';
+    } else {
+      report += 'pindah: TIDAK';
+      if (currentPos != null) report += ', posisi kini: ${fmtPos(currentPos)}';
+    }
+    if (error != null) report += ', error: $error';
+    try {
+      await _channel.invokeMethod(AudienceProtocol.displayReport, {
+        AudienceProtocol.argDetail: report,
+      });
     } catch (_) {
-      // Plugin belum teregistrasi di sub-window (lihat README).
-      // Window tetap jalan sebagai window biasa.
+      // Operator belum siap menerima — abaikan (sama seperti soundReport).
     }
   }
 

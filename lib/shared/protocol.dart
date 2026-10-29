@@ -47,6 +47,14 @@ class AudienceProtocol {
   /// selain itu teks error asli dari platform.
   static const String soundReport = 'soundReport';
 
+  /// audience → operator: laporan hasil usaha pindah display
+  /// (auto-pindah layar penonton ke monitor kedua/TV).
+  /// args: {detail: String} — ringkasan mudah dibaca, mis.
+  /// "Display: 2, target: 2 @ (1920,0), pindah: ya".
+  /// Dikirim SEKALI setelah usaha awal + retry selesai, agar kegagalan
+  /// pindah tidak lagi bisu seperti sebelumnya.
+  static const String displayReport = 'displayReport';
+
   static const String argCoupon = 'coupon';
   static const String argNama = 'nama';
   static const String argAlamat = 'alamat';
