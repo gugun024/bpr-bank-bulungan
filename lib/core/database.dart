@@ -505,6 +505,24 @@ class DatabaseHelper {
     });
   }
 
+  /// Batalkan SATU pemenang tertentu (tidak harus yang terakhir):
+  /// hapus baris winners-nya dan kembalikan has_won akunnya, atomik.
+  Future<void> cancelWinner(int winnerId) async {
+    final d = await db;
+    await d.transaction((txn) async {
+      final rows = await txn.query('winners',
+          columns: ['account_id'],
+          where: 'id = ?',
+          whereArgs: [winnerId],
+          limit: 1);
+      if (rows.isEmpty) return;
+      final accountId = rows.first['account_id'] as int;
+      await txn.delete('winners', where: 'id = ?', whereArgs: [winnerId]);
+      await txn.update('accounts', {'has_won': 0},
+          where: 'id = ?', whereArgs: [accountId]);
+    });
+  }
+
   /// Hapus SEMUA riwayat pemenang + kembalikan flag menang semua rekening.
   /// Dipakai tombol "Reset Undian" di tab Riwayat.
   Future<void> clearAllWinners() async {

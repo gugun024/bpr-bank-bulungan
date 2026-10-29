@@ -61,6 +61,33 @@ class _HistoryTabState extends State<HistoryTab> {
     }
   }
 
+  /// Batalkan SATU pemenang tertentu (tombol per baris).
+  Future<void> _cancelOne(Winner w) async {
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Batalkan kemenangan ini?'),
+        content: Text(
+            '${w.accountNama} (${Account.formatCoupon(w.couponNo)}) — "${w.prizeName}" akan dibatalkan dan rekeningnya bisa menang lagi.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                  backgroundColor: OpTheme.danger),
+              child: const Text('Ya, batalkan')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await DatabaseHelper.instance.cancelWinner(w.id!);
+      await _load();
+    }
+  }
+
   Future<void> _reset() async {
     final n = _winners.length;
     if (n == 0) return;
@@ -239,6 +266,7 @@ class _HistoryTabState extends State<HistoryTab> {
                             DataColumn(label: Text('Hadiah')),
                             DataColumn(label: Text('Mode')),
                             DataColumn(label: Text('Waktu')),
+                            DataColumn(label: Text('Aksi')),
                           ],
                           rows: [
                             for (var i = 0; i < _winners.length; i++)
@@ -284,6 +312,19 @@ class _HistoryTabState extends State<HistoryTab> {
       )),
       DataCell(ModeBadge(w.mode)),
       DataCell(Text(when, style: const TextStyle(color: OpTheme.textMuted))),
+      DataCell(
+        FilledButton(
+          onPressed: _busy ? null : () => _cancelOne(w),
+          style: FilledButton.styleFrom(
+            backgroundColor: OpTheme.danger,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            textStyle:
+                const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+          ),
+          child: const Text('Batal'),
+        ),
+      ),
     ]);
   }
 }

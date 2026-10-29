@@ -300,7 +300,8 @@ class DetailRow extends StatelessWidget {
 
 /// Pemilih hadiah sekali klik (chip): lebih cepat dari dropdown untuk
 /// operator saat acara live. Hadiah habis tampil abu-abu & tak bisa diklik.
-class PrizePicker extends StatelessWidget {
+/// Kolom cari di atas menyaring berdasarkan nama atau nomor urut.
+class PrizePicker extends StatefulWidget {
   final List<Prize> prizes;
   final int Function(Prize) remainingOf;
   final Prize? selected;
@@ -315,30 +316,87 @@ class PrizePicker extends StatelessWidget {
   });
 
   @override
+  State<PrizePicker> createState() => _PrizePickerState();
+}
+
+class _PrizePickerState extends State<PrizePicker> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<Prize> get _filtered {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return widget.prizes;
+    return widget.prizes.where((p) {
+      if (p.name.toLowerCase().contains(q)) return true;
+      // Cari juga by nomor urut: "5" cocok dengan urutan 5.
+      final n = int.tryParse(q);
+      return n != null && p.urutan == n;
+    }).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (prizes.isEmpty) {
+    if (widget.prizes.isEmpty) {
       return const Text('Belum ada hadiah. Tambahkan di tab Hadiah.',
           style: TextStyle(color: OpTheme.textMuted, fontSize: 13));
     }
+    final shown = _filtered;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < prizes.length; i++) ...[
+        TextField(
+          controller: _searchCtrl,
+          decoration: InputDecoration(
+            hintText: 'Cari hadiah / no. urut...',
+            hintStyle:
+                const TextStyle(color: OpTheme.textMuted, fontSize: 14),
+            prefixIcon: const Icon(Icons.search, size: 20),
+            suffixIcon: _query.isEmpty
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.clear, size: 20),
+                    onPressed: () {
+                      _searchCtrl.clear();
+                      setState(() => _query = '');
+                    },
+                  ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          onChanged: (v) => setState(() => _query = v),
+        ),
+        const SizedBox(height: 8),
+        if (shown.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('Tidak ada hadiah yang cocok.',
+                style: TextStyle(color: OpTheme.textMuted, fontSize: 13)),
+          ),
+        for (var i = 0; i < shown.length; i++) ...[
           if (i > 0) const SizedBox(height: 8),
-          _chip(prizes[i]),
+          _chip(shown[i]),
         ],
       ],
     );
   }
 
   Widget _chip(Prize p) {
-    final left = remainingOf(p);
+    final left = widget.remainingOf(p);
     final done = left <= 0;
-    final sel = selected;
+    final sel = widget.selected;
     final isSel = sel != null && sel.id == p.id;
-    final String name = p.name;
+    final String name = '${p.urutan}. ${p.name}';
     return InkWell(
-      onTap: done ? null : () => onChanged(p),
+      onTap: done ? null : () => widget.onChanged(p),
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
