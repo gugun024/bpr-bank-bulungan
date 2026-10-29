@@ -1048,7 +1048,7 @@ class _Header extends StatelessWidget {
             ),
             SizedBox(height: 10 * s),
             Text(
-              'Mitra Terpercaya Membangun Masa Depan',
+              'Bahagia Hari Ini, Sejahtera Hari Esok',
               style: TextStyle(
                 fontSize: 23 * s,
                 fontStyle: FontStyle.italic,
@@ -1065,7 +1065,7 @@ class _Header extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'PENGUNDIAN HADIAH',
+              'GEBYAR UNDIAN',
               style: TextStyle(
                 fontSize: 42 * s,
                 fontWeight: FontWeight.w900,
@@ -1081,7 +1081,7 @@ class _Header extends StatelessWidget {
               ),
             ),
             Text(
-              'Nasabah Setia Bank Bulungan',
+              'SIMAPAN 2026',
               style: TextStyle(
                 fontSize: 31 * s,
                 fontWeight: FontWeight.bold,
@@ -1276,7 +1276,7 @@ class _InfoPanel extends StatelessWidget {
             SizedBox(width: 20 * s),
             Expanded(
               child: Text(
-                'Nomor tidak ditemukan di data nasabah',
+                'Nomor Kupon Tidak Terdaftar',
                 style: TextStyle(fontSize: 24 * s, color: _Bc.muted),
               ),
             ),
