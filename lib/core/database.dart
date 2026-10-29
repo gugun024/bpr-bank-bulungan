@@ -39,17 +39,20 @@ class DatabaseHelper {
     return databaseFactoryFfi.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 3,
+        version: 4,
         onCreate: (db, version) async {
           await _createV1(db);
           await _createSettings(db);
           await _addPrizeImageColumn(db);
+          await _createWinnersAccountIndex(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           // v1 → v2: tambah tabel settings (tanpa mengganggu data).
           if (oldVersion < 2) await _createSettings(db);
           // v2 → v3: kolom gambar hadiah.
           if (oldVersion < 3) await _addPrizeImageColumn(db);
+          // v3 → v4: satu akun menang sekali — UNIQUE di winners.account_id.
+          if (oldVersion < 4) await _upgradeToV4(db);
         },
       ),
     );
@@ -59,6 +62,23 @@ class DatabaseHelper {
   static Future<void> _addPrizeImageColumn(Database db) async {
     await db.execute(
         "ALTER TABLE prizes ADD COLUMN image_path TEXT NOT NULL DEFAULT ''");
+  }
+
+  /// v4: satu akun hanya boleh menang sekali — UNIQUE di winners.account_id,
+  /// jaring pengaman terakhir bila cek di lapisan aplikasi lolos.
+  static Future<void> _createWinnersAccountIndex(Database db) async {
+    await db.execute(
+        'CREATE UNIQUE INDEX idx_winners_account ON winners(account_id)');
+  }
+
+  /// Migrasi v3 → v4: buang baris pemenang duplikat bila ada (simpan yang
+  /// tercatat paling awal per akun — artefak bug lama), lalu pasang index.
+  static Future<void> _upgradeToV4(Database db) async {
+    await db.execute('''
+      DELETE FROM winners
+      WHERE id NOT IN (SELECT MIN(id) FROM winners GROUP BY account_id)
+    ''');
+    await _createWinnersAccountIndex(db);
   }
 
   /// Skema awal (v1): accounts, prizes, winners.
@@ -392,6 +412,54 @@ class DatabaseHelper {
   }
 
   // ---------- winners ----------
+
+  /// Catat pemenang secara atomik: cek ulang has_won + kuota hadiah DI DALAM
+  /// satu transaksi, lalu insert baris winners dan tandai has_won bersamaan.
+  /// Melempar StateError bila rekening tidak ada / sudah menang / kuota habis.
+  /// UNIQUE idx_winners_account menjadi jaring pengaman terakhir di level skema.
+  Future<void> recordWinnerTx({
+    required int couponNo,
+    required int accountId,
+    required int prizeId,
+    required String mode,
+  }) async {
+    final d = await db;
+    await d.transaction((txn) async {
+      final acc = await txn.query('accounts',
+          columns: ['has_won'],
+          where: 'id = ?',
+          whereArgs: [accountId],
+          limit: 1);
+      if (acc.isEmpty) throw StateError('Rekening tidak ditemukan.');
+      if ((acc.first['has_won'] as int) == 1) {
+        throw StateError('Rekening sudah menang.');
+      }
+      final pr = await txn.query('prizes',
+          columns: ['qty', 'name'],
+          where: 'id = ?',
+          whereArgs: [prizeId],
+          limit: 1);
+      if (pr.isEmpty) throw StateError('Hadiah tidak ditemukan.');
+      final qty = (pr.first['qty'] as int?) ?? 0;
+      final wonRows = await txn.rawQuery(
+          'SELECT COUNT(*) AS c FROM winners WHERE prize_id = ?', [prizeId]);
+      final won = (wonRows.first['c'] as int?) ?? 0;
+      if (won >= qty) {
+        throw StateError('Hadiah "${pr.first['name']}" sudah habis.');
+      }
+      await txn.insert(
+          'winners',
+          Winner(
+            couponNo: couponNo,
+            accountId: accountId,
+            prizeId: prizeId,
+            mode: mode,
+            drawnAt: DateTime.now().toIso8601String(),
+          ).toMap());
+      await txn.update('accounts', {'has_won': 1},
+          where: 'id = ?', whereArgs: [accountId]);
+    });
+  }
 
   Future<int> insertWinner(Winner w) async {
     final d = await db;

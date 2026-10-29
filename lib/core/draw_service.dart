@@ -53,32 +53,22 @@ class DrawService {
     return null;
   }
 
-  /// Catat pemenang: insert winners + tandai rekening menang.
-  /// Menolak (StateError) bila kuota hadiah sudah habis — pengaman
-  /// lapis kedua selain dropdown yang menonaktifkan hadiah habis.
+  /// Catat pemenang: insert winners + tandai rekening menang, atomik.
+  /// Cek ulang has_won dan kuota hadiah dilakukan DI DALAM satu transaksi
+  /// (lihat DatabaseHelper.recordWinnerTx) — aturan "satu akun menang sekali"
+  /// ditegakkan di lapisan tulis, bukan hanya sebelum tulis.
+  /// Menolak (StateError) bila rekening sudah menang atau kuota hadiah habis.
   Future<void> recordWinner({
     required int couponNo,
     required int accountId,
     required int prizeId,
     required String mode,
   }) async {
-    final db = DatabaseHelper.instance;
-    final prizes = await db.getPrizes();
-    final prize = prizes.where((p) => p.id == prizeId).firstOrNull;
-    if (prize == null) {
-      throw StateError('Hadiah tidak ditemukan.');
-    }
-    final won = await db.winnerCountForPrize(prizeId);
-    if (won >= prize.qty) {
-      throw StateError('Hadiah "${prize.name}" sudah habis.');
-    }
-    await db.insertWinner(Winner(
+    await DatabaseHelper.instance.recordWinnerTx(
       couponNo: couponNo,
       accountId: accountId,
       prizeId: prizeId,
       mode: mode,
-      drawnAt: DateTime.now().toIso8601String(),
-    ));
-    await db.markWon(accountId);
+    );
   }
 }
