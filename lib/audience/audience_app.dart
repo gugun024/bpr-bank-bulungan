@@ -80,7 +80,10 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   String _prize = '';
   String _rejectedRekening = '';
   String _rejectedWaktu = '';
-  String _rolling = '000000';
+  /// Angka kocokan shuffle. ValueNotifier (bukan setState utama) agar
+  /// selama shuffle HANYA teks angka yang rebuild lewat
+  /// ValueListenableBuilder — latar, header, dan panel statis diam.
+  final ValueNotifier<String> _rolling = ValueNotifier('000000');
   Timer? _rollTimer;
   final _rand = Random();
 
@@ -420,9 +423,9 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
     _stopRoll();
     _rollTimer = Timer.periodic(const Duration(milliseconds: 70), (_) {
       if (mounted) {
-        setState(() {
-          _rolling = _rand.nextInt(1000000).toString().padLeft(6, '0');
-        });
+        // Hanya notifier yang berubah: yang rebuild hanyalah
+        // ValueListenableBuilder angka (panel + blok), bukan layar penuh.
+        _rolling.value = _rand.nextInt(1000000).toString().padLeft(6, '0');
         // Roll berjalan senyap; suara hanya pada reveal pemenang dan
         // diputar oleh window operator (lihat Sounds.playReveal) —
         // bukan dari sub-window ini.
@@ -433,12 +436,16 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   void _stopRoll() {
     _rollTimer?.cancel();
     _rollTimer = null;
+    // Reset angka saat stage berubah (idle/winner/rejected/notFound):
+    // angka kocokan tidak tampil di stage-stage itu.
+    _rolling.value = '000000';
   }
 
   @override
   void dispose() {
     windowManager.removeListener(this);
     _stopRoll();
+    _rolling.dispose();
     super.dispose();
   }
 
@@ -457,12 +464,15 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
       home: Scaffold(
         body: Stack(
           children: [
+            // Latar statis di boundary-nya sendiri: repaint angka
+            // kocokan / animasi reveal tidak merambat ke foto, gradasi,
+            // maupun gelombang.
             if (cutout)
-              _CutoutStage(path: _gambar, scale: s)
+              RepaintBoundary(child: _CutoutStage(path: _gambar, scale: s))
             else if (hasPhoto)
-              _ImmersiveBackground(path: _gambar)
+              RepaintBoundary(child: _ImmersiveBackground(path: _gambar))
             else
-              _BroadcastBackground(scale: s),
+              RepaintBoundary(child: _BroadcastBackground(scale: s)),
             // Scrim atas: di atas latar/objek, di bawah panel & header
             // (z-order mock final: scrim 3, panel 4, header 5).
             Positioned(
@@ -491,7 +501,9 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
               top: 40 * s,
               left: 52 * s,
               right: 52 * s,
-              child: _Header(scale: s),
+              // Header statis (logo + brand + judul) di boundary-nya
+              // sendiri, terpisah dari zona konten yang berubah.
+              child: RepaintBoundary(child: _Header(scale: s)),
             ),
           ],
         ),
@@ -515,7 +527,15 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
     }
     return Stack(
       children: [
-        Positioned(right: 0, top: 0, bottom: 0, child: _panelForStage(s)),
+        // Badan panel (kaca, label, bar) di boundary-nya sendiri.
+        // Angka kocokan di dalamnya punya boundary sendiri (lihat
+        // numbox _InfoPanel), jadi tick shuffle tidak me-repaint panel.
+        Positioned(
+          right: 0,
+          top: 0,
+          bottom: 0,
+          child: RepaintBoundary(child: _panelForStage(s)),
+        ),
         Positioned(
           left: 16 * s,
           bottom: 24 * s,
@@ -535,10 +555,26 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           mode: _InfoMode.menunggu,
         );
       case _Stage.shuffle:
+        // Angka lewat ValueListenableBuilder: tiap tick 70ms hanya
+        // numbox yang rebuild, bukan panel/layar penuh. Gaya teks
+        // disamakan dengan numbox _InfoPanel (54*s w900 navy).
         return _InfoPanel(
           scale: s,
           numLabel: 'NOMOR KUPON',
-          numText: _rolling,
+          numText: '',
+          numTextWidget: ValueListenableBuilder<String>(
+            valueListenable: _rolling,
+            builder: (_, value, __) => Text(
+              value,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 54 * s,
+                fontWeight: FontWeight.w900,
+                color: _Bc.navy,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
           mode: _InfoMode.menunggu,
           waitingText: 'Sedang mengundi…',
         );
@@ -625,7 +661,14 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
           _stagePill(s, text: 'SEDANG DIUNDI'),
           SizedBox(height: 20 * s),
           Text('NOMOR KUPON', style: small(_Bc.goldLight)),
-          Text(_rolling, style: bigNumber(Colors.white)),
+          // Hanya teks angka yang rebuild tiap tick (boundary-nya
+          // sendiri, di luar lapisan statis blok).
+          ValueListenableBuilder<String>(
+            valueListenable: _rolling,
+            builder: (_, value, __) => RepaintBoundary(
+              child: Text(value, style: bigNumber(Colors.white)),
+            ),
+          ),
           if (_prize.isNotEmpty) ...[
             SizedBox(height: 14 * s),
             Text(
@@ -1091,6 +1134,12 @@ class _InfoPanel extends StatelessWidget {
   final double scale;
   final String numLabel;
   final String numText;
+
+  /// Widget angka kustom untuk numbox. Bila diisi (dipakai stage
+  /// shuffle), widget ini dipakai sebagai pengganti Text(numText) —
+  /// sehingga angka kocokan bisa berubah lewat ValueListenableBuilder
+  /// tanpa me-rebuild panel.
+  final Widget? numTextWidget;
   final String waitingText;
   final _InfoMode mode;
   final String nama;
@@ -1107,6 +1156,7 @@ class _InfoPanel extends StatelessWidget {
     required this.scale,
     required this.numText,
     required this.mode,
+    this.numTextWidget,
     this.numLabel = 'NOMOR KUPON PEMENANG',
     this.waitingText = 'Menunggu pengundian…',
     this.nama = '',
@@ -1157,15 +1207,20 @@ class _InfoPanel extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: 4 * s),
-                Text(
-                  numText,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 54 * s,
-                    fontWeight: FontWeight.w900,
-                    color: _Bc.navy,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                // Angka di boundary-nya sendiri: saat shuffle, perubahan
+                // angka hanya me-repaint lapisan kecil ini, bukan panel.
+                RepaintBoundary(
+                  child: numTextWidget ??
+                      Text(
+                        numText,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 54 * s,
+                          fontWeight: FontWeight.w900,
+                          color: _Bc.navy,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
                 ),
               ],
             ),
@@ -1428,7 +1483,7 @@ class _WinnerRevealState extends State<_WinnerReveal>
     // Catatan: roll berjalan SENYAP total — window operator hanya
     // menjadwalkan fanfare di ujung roll ini (Sounds.playReveal,
     // 2,6 dtk), tanpa tick sama sekali.
-    _pieces = List.generate(90, (_) => _Confetti.random(_rand));
+    _pieces = List.generate(60, (_) => _Confetti.random(_rand));
     _roll.forward();
   }
 
