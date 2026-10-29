@@ -138,6 +138,7 @@ class _ManualTabState extends State<ManualTab> {
         final couponStr = Account.formatCoupon(n, _couponWidth);
         setState(() => _error =
             'Kupon $couponStr tidak terdaftar. Periksa ketikan & coba lagi.');
+        Sounds.error();
         // Nomor keluar di depan penonton — sampaikan valid/tidaknya
         // bila toggle aktif.
         if (_showRejectedOnAudience) {
@@ -164,6 +165,7 @@ class _ManualTabState extends State<ManualTab> {
             'Kupon ${Account.formatCoupon(n, _couponWidth)} milik ${res.account.nama} '
                 '(${res.account.rekening}) SUDAH MENANG${prize != null ? ' "$prize"' : ''}'
                 '${whenStr.isNotEmpty ? ' pada $whenStr' : ''}. Undi ulang!');
+        Sounds.error();
         // Opsional: teruskan info penolakan ke layar penonton.
         if (_showRejectedOnAudience) {
           await AudienceChannel.send(AudienceProtocol.showRejected, {
@@ -219,6 +221,7 @@ class _ManualTabState extends State<ManualTab> {
       await _loadPrizes(); // refresh sisa kuota hadiah
     } on StateError catch (e) {
       if (mounted) {
+        Sounds.error();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message), backgroundColor: OpTheme.danger),
         );

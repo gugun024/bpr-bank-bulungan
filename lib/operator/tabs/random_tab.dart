@@ -120,6 +120,7 @@ class _RandomTabState extends State<RandomTab> {
       final res = await _svc.drawRandom();
       if (!mounted) return;
       if (res == null) {
+        Sounds.error();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Pool kosong — semua sudah menang.')),
         );
@@ -164,6 +165,7 @@ class _RandomTabState extends State<RandomTab> {
       await _refresh();
     } on StateError catch (e) {
       if (mounted) {
+        Sounds.error();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message), backgroundColor: OpTheme.danger),
         );

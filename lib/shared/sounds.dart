@@ -18,12 +18,13 @@ typedef _PlaySoundDart = int Function(
     ffi.Pointer<ffi.Void> hmod,
     int fdwSound);
 
-/// Efek suara undian: FANFARE SAJA. Roll/kocokan dalam keadaan apa
-/// pun SENYAP total — tidak ada suara tick sama sekali, termasuk
-/// selama roll reveal. Satu-satunya suara acara adalah fanfare tepat
-/// saat nomor pemenang mengunci di layar penonton ([playReveal]
-/// menjadwalkannya di ujung roll visual 2,6 detik), plus putar manual
-/// dari tombol Tes Suara ([fanfare]).
+/// Efek suara undian: FANFARE kemenangan + BIP ERROR pendek.
+/// Roll/kocokan dalam keadaan apa pun SENYAP total — tidak ada suara tick
+/// sama sekali, termasuk selama roll reveal. Fanfare bunyi tepat saat nomor
+/// pemenang mengunci di layar penonton ([playReveal] menjadwalkannya di ujung
+/// roll visual 2,6 detik), plus putar manual dari tombol Tes Suara ([fanfare]).
+/// Bip error ([error]) bunyi saat kupon tidak terdaftar, kupon sudah menang,
+/// pool kosong, atau pencatatan pemenang ditolak (StateError).
 ///
 /// PEMUTARAN dilakukan dari window OPERATOR (engine utama). Alasan:
 /// plugin audioplayers terbukti tidak bunyi di sub-window penonton
@@ -57,6 +58,7 @@ class Sounds {
   static bool _poolFailed = false;
   static Object? _poolError;
   static Timer? _revealFanfareTimer;
+  static String? _errorPath;
 
   // --- Jalur cadangan winmm ---
   static bool _fallbackActive = false;
@@ -204,6 +206,24 @@ class Sounds {
     }
   }
 
+  /// Bip error pendek — kupon tidak terdaftar, kupon sudah menang,
+  /// pool kosong, atau pencatatan pemenang ditolak. Diputar instan
+  /// (tidak dijadwalkan seperti fanfare reveal).
+  static Future<void> error() async {
+    if (_muted) return;
+    if (_fallbackActive) {
+      _playWinmm(_errorPath);
+      return;
+    }
+    try {
+      await _fanfarePlayer.play(AssetSource('sounds/error.wav'));
+    } catch (e) {
+      debugPrint('[Sounds] error gagal: $e');
+      onError?.call('error', e);
+      if (await _activateFallback()) _playWinmm(_errorPath);
+    }
+  }
+
   // ---------- Pola putar untuk window operator ----------
 
   /// Urutan suara reveal pemenang: SENYAP total selama roll visual
@@ -243,13 +263,17 @@ class Sounds {
   /// Ekstrak WAV dari aset ke folder temp agar bisa diputar PlaySound.
   /// Null = siap; selain itu teks error.
   static Future<String?> _prepareWinmm() async {
-    if (_tickPath != null && _fanfarePath != null) return null;
+    if (_tickPath != null && _fanfarePath != null && _errorPath != null) {
+      return null;
+    }
     try {
       final dir = await getTemporaryDirectory();
       _tickPath =
           await _extract('assets/sounds/tick.wav', dir, 'undian_tick.wav');
       _fanfarePath = await _extract(
           'assets/sounds/fanfare.wav', dir, 'undian_fanfare.wav');
+      _errorPath =
+          await _extract('assets/sounds/error.wav', dir, 'undian_error.wav');
       return null;
     } catch (e) {
       return 'ekstrak wav: $e';

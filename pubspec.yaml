@@ -32,8 +32,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/images/logo_bpr.png
     - assets/sounds/tick.wav
     - assets/sounds/fanfare.wav
+    - assets/sounds/error.wav
     - assets/samples/contoh-hadiah.csv
     - assets/samples/contoh-nasabah.csv
     - assets/fonts/DejaVuSans.ttf

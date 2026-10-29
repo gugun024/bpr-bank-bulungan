@@ -122,10 +122,17 @@ class _AudienceAppState extends State<AudienceApp> with WindowListener {
   /// Dekode file gambar dan hitung fraksi piksel dengan alpha < 250.
   /// Cutout bila fraksi > 1%. Yang menentukan adalah ISI alpha-nya,
   /// bukan ekstensi file (PNG yang sepenuhnya opaque = latar).
+  /// Decode dibatasi 1024px sisi lebar (tanpa upscale): untuk hitung
+  /// fraksi alpha sampel kecil sudah akurat, dan foto raksasa tidak
+  /// meledakkan memori saat dikonversi ke RGBA mentah.
   Future<bool> _detectTransparency(String path) async {
     try {
       final bytes = await File(path).readAsBytes();
-      final codec = await ui.instantiateImageCodec(bytes);
+      final codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: 1024,
+        allowUpscaling: false,
+      );
       try {
         final frame = await codec.getNextFrame();
         try {
@@ -905,6 +912,9 @@ class _CutoutStage extends StatelessWidget {
           child: Image.file(
             File(path),
             fit: BoxFit.contain,
+            // Objek ditampilkan setinggi 800*s (maks ~1280px): decode
+            // lebih besar dari itu hanya buang memori.
+            cacheHeight: 1536,
             errorBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
         ),
@@ -928,6 +938,10 @@ class _ImmersiveBackground extends StatelessWidget {
         Image.file(
           File(path),
           fit: BoxFit.cover,
+          // Background fullscreen di balik shade gradient: 2048px sudah
+          // tajam di proyektor 1080p dan cukup di TV 4K, tanpa beban
+          // decode foto raksasa.
+          cacheWidth: 2048,
           errorBuilder: (_, __, ___) => const ColoredBox(color: _Bc.navyDeep),
         ),
         const DecoratedBox(
@@ -1020,63 +1034,19 @@ class _Header extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Logo placeholder: kotak gradient hijau-biru + huruf "B".
-        // Diganti file logo asli bank bila sudah tersedia.
-        Container(
-          width: 104 * s,
-          height: 104 * s,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF7ED957), Color(0xFF0E9F6E), Color(0xFF1565C0)],
-              stops: [0.0, 0.45, 1.0],
-            ),
-            borderRadius: BorderRadius.circular(24 * s),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0x59000000),
-                blurRadius: 28 * s,
-                offset: Offset(0, 8 * s),
-              ),
-            ],
-          ),
-          child: Center(
-            child: Text(
-              'B',
-              style: TextStyle(
-                fontSize: 64 * s,
-                fontWeight: FontWeight.w900,
-                fontStyle: FontStyle.italic,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: 24 * s),
+        // Logo resmi bank: lockup PNG transparan (mark + tulisan).
+        // 3024x790 ≈ 3.83:1 — tinggi disamakan bekas placeholder (104*s),
+        // lebar mengikuti aspek asli agar tidak gepeng.
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'PT. BPR',
-              style: TextStyle(
-                fontSize: 24 * s,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2 * s,
-                color: _Bc.goldLight,
-              ),
+            Image.asset(
+              'assets/images/logo_bpr.png',
+              height: 104 * s,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
-            Text(
-              'BANK BULUNGAN',
-              style: TextStyle(
-                fontSize: 48 * s,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5 * s,
-                height: 1.05,
-                color: Colors.white,
-              ),
-            ),
+            SizedBox(height: 10 * s),
             Text(
               'Mitra Terpercaya Membangun Masa Depan',
               style: TextStyle(
