@@ -47,39 +47,33 @@ class _RandomTabState extends State<RandomTab> {
     for (final p in prizes) {
       remaining[p.id!] = p.qty - await db.winnerCountForPrize(p.id!);
     }
-    // Pilihan hadiah terakhir operator (per tab) — dipulihkan bila masih ada.
-    final savedId = int.tryParse(await db.getSetting(_kSelectedPrize) ?? '');
     if (!mounted) return;
+    // Nama hadiah yang pilihannya dikosongkan karena habis/dihapus
+    // (untuk snackbar pemberitahuan di bawah).
+    String? clearedName;
     setState(() {
       _prizes = prizes;
       _remaining = remaining;
       _pool = pool;
       _winners = winners;
       _couponWidth = pool.toString().length.clamp(6, 12);
-      if (_prize == null ||
-          !prizes.any((p) => p.id == _prize!.id) ||
-          _left(_prize!) <= 0) {
+      // TIDAK ada pilih otomatis sama sekali — operator wajib ketuk manual
+      // hadiahnya. Kalau hadiah yang sedang dipilih habis/dihapus:
+      // kosongkan pilihan (tombol undi terkunci) + beri tahu operator.
+      if (_prize != null &&
+          (!prizes.any((p) => p.id == _prize!.id) ||
+              _left(_prize!) <= 0)) {
+        clearedName = _prize!.name;
         _prize = null;
-        // 1) Pulihkan pilihan terakhir operator bila masih tersedia.
-        if (savedId != null) {
-          for (final p in prizes) {
-            if (p.id == savedId && _left(p) > 0) {
-              _prize = p;
-              break;
-            }
-          }
-        }
-        // 2) Kalau tidak ada, pilih hadiah pertama yang masih ada sisa.
-        if (_prize == null) {
-          for (final p in prizes) {
-            if (_left(p) > 0) {
-              _prize = p;
-              break;
-            }
-          }
-        }
       }
     });
+    if (clearedName != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(
+                '"$clearedName" sudah habis — pilih hadiah berikutnya.')),
+      );
+    }
   }
 
   void _onPrizeChanged(Prize? p) {
