@@ -174,6 +174,8 @@ jobs:
         run: |
           $out = "build/windows/x64/runner/Release"
           if (!(Test-Path $out)) { throw "Folder hasil build tidak ditemukan: $out" }
+          # Sertakan panduan syarat & cara pakai versi portable.
+          Copy-Item "installer/README-portable.txt" -Destination "$out/BACA-DULU.txt" -Force
           Compress-Archive -Path "$out/*" -DestinationPath "PT-BPR-Bank-Bulungan-windows.zip" -Force
           Get-Item "PT-BPR-Bank-Bulungan-windows.zip" | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
 
@@ -187,6 +189,10 @@ jobs:
           choco install innosetup --no-progress -y
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           if (!(Test-Path $iscc)) { throw "ISCC tidak ditemukan: $iscc" }
+          # Unduh VC++ Redistributable agar installer bisa memasangnya
+          # otomatis bila belum ada di PC target (lihat .iss: NeedsVCRedist).
+          New-Item -ItemType Directory -Force -Path "installer/redist" | Out-Null
+          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "installer/redist/vc_redist.x64.exe"
           $ver = (Select-String -Path "pubspec.yaml" -Pattern "^version:\s*(\d+\.\d+\.\d+)").Matches.Groups[1].Value
           if (!$ver) { throw "Versi pubspec.yaml tidak ditemukan" }
           (Get-Content "installer/bpr-bank-bulungan.iss" -Raw) -replace "__APP_VERSION__", $ver |
